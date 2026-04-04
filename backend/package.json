@@ -4,6 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
+    "dev": "nodemon server.ts",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
@@ -11,6 +12,7 @@
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
+    "@prisma/client": "^6.19.3",
     "cors": "^2.8.6",
     "dotenv": "^17.3.1",
     "express": "^5.2.1"
@@ -20,7 +22,7 @@
     "@types/express": "^5.0.6",
     "@types/node": "^25.5.0",
     "nodemon": "^3.1.14",
-    "prisma": "^7.6.0",
+    "prisma": "^6.19.3",
     "ts-node": "^10.9.2",
     "typescript": "^6.0.2"
   }

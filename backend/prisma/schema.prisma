@@ -1,13 +1,147 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Get a free hosted Postgres database in seconds: `npx create-db`
-
+// backend/prisma/schema.prisma
 generator client {
-  provider = "prisma-client"
-  output   = "../generated/prisma"
+  provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "postgresql"
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ================= ROLES Y ESTADOS =================
+enum Rol {
+  SUPER_ADMIN       // Farid (Tú)
+  OWNER_PRINCIPAL   // El que paga y no puede ser borrado
+  CO_OWNER          // Los dueños secundarios
+  ADMINISTRADOR     // Maneja una sucursal
+  EMPLEADO          // Solo vende
+}
+
+enum EstadoGeneral {
+  ACTIVO
+  BLOQUEADO
+  CERRADO
+}
+
+enum MetodoPago {
+  EFECTIVO
+  QR
+  TARJETA
+}
+
+// ================= TABLAS CORE =================
+
+model PlanSuscripcion {
+  id             String     @id @default(uuid())
+  nombre         String     // Semilla, Crecimiento, Corporativo
+  precioBs       Float
+  limitePrendas  Int
+  limiteSucursal Int
+  empresas       Empresa[]
+}
+
+model Empresa {
+  id               String           @id @default(uuid())
+  nombre           String
+  fechaRegistro    DateTime         @default(now())
+  
+  planId           String
+  plan             PlanSuscripcion  @relation(fields: [planId], references: [id])
+
+  sucursales       Sucursal[]
+  usuarios         Usuario[]
+  prendas          Prenda[]
+  ventas           Venta[]
+}
+
+model Sucursal {
+  id               String         @id @default(uuid())
+  nombre           String         // Ej: Casa Matriz - Boutique Elegance
+  direccion        String?        
+  estado           EstadoGeneral  @default(ACTIVO) 
+  
+  empresaId        String
+  empresa          Empresa        @relation(fields: [empresaId], references: [id])
+  
+  usuarios         Usuario[]
+  prendas          Prenda[]
+  ventas           Venta[]
+}
+
+model Usuario {
+  id               String         @id @default(uuid())
+  nombreCompleto   String         
+  ci               String         @unique 
+  correo           String         @unique 
+  telefono         String?        
+  password         String         
+  debeCambiarPass  Boolean        @default(true) 
+  rol              Rol            
+  estado           EstadoGeneral  @default(ACTIVO) 
+
+  empresaId        String
+  empresa          Empresa        @relation(fields: [empresaId], references: [id])
+  
+  sucursalId       String?        // Opcional para Owners
+  sucursal         Sucursal?      @relation(fields: [sucursalId], references: [id])
+  ventasRealizadas Venta[]        @relation("Vendedor")
+}
+
+model Prenda {
+  id               String       @id @default(uuid())
+  codigo           String       @unique // Escáner, QR o manual
+  marca            String?      
+  tipo             String       
+  detalles         String?      
+  foto             String?      
+  precio           Float        
+  rebaja           Float?       
+  
+  vendido          Boolean      @default(false) 
+  publicadoWeb     Boolean      @default(false) 
+
+  empresaId        String
+  empresa          Empresa      @relation(fields: [empresaId], references: [id])
+  sucursalId       String       
+  sucursal         Sucursal     @relation(fields: [sucursalId], references: [id])
+  
+  // Relación con el detalle de ventas
+  detallesVenta    DetalleVenta[]
+}
+
+// ================= TABLAS DE VENTA Y PAGOS (Para Pagos Divididos) =================
+
+model Venta {
+  id               String         @id @default(uuid())
+  fecha            DateTime       @default(now())
+  totalCobrado     Float
+  
+  empresaId        String
+  empresa          Empresa        @relation(fields: [empresaId], references: [id])
+  sucursalId       String
+  sucursal         Sucursal       @relation(fields: [sucursalId], references: [id])
+  
+  vendedorId       String
+  vendedor         Usuario        @relation("Vendedor", fields: [vendedorId], references: [id])
+
+  detallesPrendas  DetalleVenta[]
+  metodosDePago    PagoVenta[]
+}
+
+model DetalleVenta {
+  id               String       @id @default(uuid())
+  ventaId          String
+  venta            Venta        @relation(fields: [ventaId], references: [id])
+  prendaId         String
+  prenda           Prenda       @relation(fields: [prendaId], references: [id])
+  precioVendido    Float        
+}
+
+model PagoVenta {
+  id               String       @id @default(uuid())
+  ventaId          String
+  venta            Venta        @relation(fields: [ventaId], references: [id])
+  metodo           MetodoPago   // EFECTIVO, QR, TARJETA
+  monto            Float        // Ej: 100 Bs QR, 100 Bs Efectivo
 }
