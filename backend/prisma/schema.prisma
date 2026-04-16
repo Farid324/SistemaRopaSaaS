@@ -1,4 +1,5 @@
 // backend/prisma/schema.prisma
+
 generator client {
   provider = "prisma-client-js"
 }
@@ -9,13 +10,14 @@ datasource db {
   directUrl = env("DIRECT_URL")
 }
 
-// ================= ROLES Y ESTADOS =================
+// ═══════════════════ ENUMS ═══════════════════
+
 enum Rol {
-  SUPER_ADMIN // Farid (Tú)
-  OWNER_PRINCIPAL // El que paga y no puede ser borrado
-  CO_OWNER // Los dueños secundarios
-  ADMINISTRADOR // Maneja una sucursal
-  EMPLEADO // Solo vende
+  SUPER_ADMIN
+  OWNER_PRINCIPAL
+  CO_OWNER
+  ADMINISTRADOR
+  EMPLEADO
 }
 
 enum EstadoGeneral {
@@ -30,15 +32,37 @@ enum MetodoPago {
   TARJETA
 }
 
-// ================= TABLAS CORE =================
+enum TipoCodigo {
+  BARRAS
+  QR
+  MANUAL
+}
+
+enum EstadoPrenda {
+  NUEVO
+  SEMI_NUEVO
+  USADO
+}
+
+enum EstadoVenta {
+  DISPONIBLE
+  VENDIDO
+  RESERVADO
+}
+
+// ═══════════════════ TABLAS ═══════════════════
 
 model PlanSuscripcion {
-  id             String    @id @default(uuid())
-  nombre         String // Semilla, Crecimiento, Corporativo
-  precioBs       Float
-  limitePrendas  Int
-  limiteSucursal Int
-  empresas       Empresa[]
+  id              String    @id @default(uuid())
+  nombre          String    // Semilla, Crecimiento, Corporativo
+  precioBsMensual Float     @default(0)
+  precioBsTrimestral Float? // solo Crecimiento
+  precioBsAnual   Float?
+  limitePrendas   Int
+  limiteSucursal  Int
+  limiteEmpleados Int       @default(2)
+  accesoWeb       Boolean   @default(false) // Semilla = false
+  empresas        Empresa[]
 }
 
 model Empresa {
@@ -56,10 +80,13 @@ model Empresa {
 }
 
 model Sucursal {
-  id        String        @id @default(uuid())
-  nombre    String // Ej: Casa Matriz - Boutique Elegance
-  direccion String?
-  estado    EstadoGeneral @default(ACTIVO)
+  id                  String        @id @default(uuid())
+  nombre              String
+  direccion           String?
+  detalles            String?
+  horarios            String?       @default("08:00 - 20:00")
+  maxAdministradores  Int           @default(2)
+  estado              EstadoGeneral @default(ACTIVO)
 
   empresaId String
   empresa   Empresa @relation(fields: [empresaId], references: [id])
@@ -70,47 +97,50 @@ model Sucursal {
 }
 
 model Usuario {
-  id              String        @id @default(uuid())
-  nombreCompleto  String
-  ci              String        @unique
-  correo          String        @unique
-  telefono        String?
-  password        String
-  debeCambiarPass Boolean       @default(true)
-  rol             Rol
-  estado          EstadoGeneral @default(ACTIVO)
+  id                   String        @id @default(uuid())
+  nombreCompleto       String
+  ci                   String        @unique
+  correo               String        @unique
+  telefono             String?
+  edad                 Int?
+  fechaIngreso         DateTime      @default(now())
+  fotoPerfil           String?
+  password             String        // Inicialmente = CI
+  debeCambiarPass      Boolean       @default(true)
+  rol                  Rol
+  estado               EstadoGeneral @default(ACTIVO)
+  permisoEditarPrendas Boolean       @default(false) // Solo relevante para EMPLEADO
 
   empresaId String
   empresa   Empresa @relation(fields: [empresaId], references: [id])
 
-  sucursalId       String? // Opcional para Owners
+  sucursalId       String?
   sucursal         Sucursal? @relation(fields: [sucursalId], references: [id])
+
   ventasRealizadas Venta[]   @relation("Vendedor")
 }
 
 model Prenda {
-  id       String  @id @default(uuid())
-  codigo   String  @unique // Escáner, QR o manual
-  marca    String?
-  tipo     String
-  detalles String?
-  foto     String?
-  precio   Float
-  rebaja   Float?
-
-  vendido      Boolean @default(false)
-  publicadoWeb Boolean @default(false)
+  id          String       @id @default(uuid())
+  codigo      String       @unique
+  tipoCodigo  TipoCodigo   @default(MANUAL)
+  marca       String?
+  tipo        String       // Blusa, Pantalón, Vestido, etc.
+  detalles    String?
+  estado      EstadoPrenda @default(NUEVO)
+  foto        String?
+  precio      Float
+  rebaja      Float?
+  estadoVenta EstadoVenta  @default(DISPONIBLE)
+  publicadoWeb Boolean     @default(false)
 
   empresaId  String
   empresa    Empresa  @relation(fields: [empresaId], references: [id])
   sucursalId String
   sucursal   Sucursal @relation(fields: [sucursalId], references: [id])
 
-  // Relación con el detalle de ventas
   detallesVenta DetalleVenta[]
 }
-
-// ================= TABLAS DE VENTA Y PAGOS (Para Pagos Divididos) =================
 
 model Venta {
   id           String   @id @default(uuid())
@@ -121,9 +151,8 @@ model Venta {
   empresa    Empresa  @relation(fields: [empresaId], references: [id])
   sucursalId String
   sucursal   Sucursal @relation(fields: [sucursalId], references: [id])
-
   vendedorId String
-  vendedor   Usuario @relation("Vendedor", fields: [vendedorId], references: [id])
+  vendedor   Usuario  @relation("Vendedor", fields: [vendedorId], references: [id])
 
   detallesPrendas DetalleVenta[]
   metodosDePago   PagoVenta[]
@@ -142,6 +171,6 @@ model PagoVenta {
   id      String     @id @default(uuid())
   ventaId String
   venta   Venta      @relation(fields: [ventaId], references: [id])
-  metodo  MetodoPago // EFECTIVO, QR, TARJETA
-  monto   Float // Ej: 100 Bs QR, 100 Bs Efectivo
+  metodo  MetodoPago
+  monto   Float
 }
