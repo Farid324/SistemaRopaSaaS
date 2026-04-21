@@ -14,6 +14,7 @@ import { Input } from '../../../src/components/ui/forms/input';
 import { Switch } from '../../../src/components/ui/forms/switch';
 import { ConfirmModal, ConfirmModalState, INITIAL_CONFIRM_STATE } from '../../../src/components/ui/overlays/confirm-modal';
 import api from '../../../src/services/api';
+import { useFocusEffect } from 'expo-router';
 
 // ── Types ──
 type Rol = 'OWNER_PRINCIPAL' | 'CO_OWNER' | 'ADMINISTRADOR' | 'EMPLEADO';
@@ -49,7 +50,6 @@ export default function PersonalScreen() {
   const [editing, setEditing] = useState<Usuario | null>(null);
   const [confirmModal, setConfirmModal] = useState<ConfirmModalState>(INITIAL_CONFIRM_STATE);
 
-  //if (!currentUser) return null;
   const isOwner = currentUser?.rol === 'OWNER_PRINCIPAL' || currentUser?.rol === 'CO_OWNER' || currentUser?.rol === 'SUPER_ADMIN';
 
   // ── Cargar datos del backend ──
@@ -68,8 +68,12 @@ export default function PersonalScreen() {
       setRefreshing(false);
     }
   }, []);
-
-  useEffect(() => { fetchData(); }, [fetchData]);
+ 
+  useFocusEffect(
+  useCallback(() => {
+    fetchData();
+  }, [fetchData])
+);
 
   if (!currentUser) return null;
   

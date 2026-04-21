@@ -39,7 +39,13 @@
           }
         }
       ],
-      "react-native-vision-camera"
+      "react-native-vision-camera",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Permitir a Boutique App usar la cámara para escanear códigos"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

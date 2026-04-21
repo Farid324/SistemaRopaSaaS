@@ -113,7 +113,10 @@ export default function TabsLayout() {
     >
       {/* 1. OCULTAMOS EL ARCHIVO REDIRECCIONADOR PARA QUE NO SEA UN TAB */}
       <Tabs.Screen name="index" options={{ href: null }} />
-
+      <Tabs.Screen name="inventario/types" options={{ href: null }} />
+      <Tabs.Screen name="inventario/components/ScannerModal" options={{ href: null }} />
+      <Tabs.Screen name="inventario/components/PrendaFormModal" options={{ href: null }} />
+      <Tabs.Screen name="inventario/components/PrendaViewModal" options={{ href: null }} />
       {/* 2. CONFIGURAMOS NUESTRAS 7 CARPETAS (TABS REALES) */}
       {ALL_TABS.map((tab) => {
         const isVisible = visibleTabs.includes(tab.name);
