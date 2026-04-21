@@ -46,7 +46,10 @@ export const sucursalesController = {
 
       await sucursalesService.remove(id);
       res.json({ message: 'Sucursal eliminada' });
-    } catch (error) {
+    } catch (error: any) {
+      if (error.code === 'P2003') {
+        return res.status(400).json({ message: 'No se puede eliminar: tiene datos asociados' });
+      }
       console.error('Delete sucursal error:', error);
       res.status(500).json({ message: 'Error al eliminar sucursal' });
     }
