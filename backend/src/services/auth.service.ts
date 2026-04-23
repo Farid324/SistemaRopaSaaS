@@ -1,4 +1,4 @@
-// backend/src/services/auth.service.ts
+// backend/src/services/auth.service.ts  (REEMPLAZA el existente)
 
 import { prisma } from '../config/prisma';
 import { generateToken, hashPassword, comparePassword } from '../config/auth';
@@ -24,6 +24,7 @@ export const authService = {
     return { token, user: userData };
   },
 
+  // Primer ingreso (no requiere contraseña actual)
   async cambiarPassword(userId: string, nuevaPassword: string) {
     const updated = await prisma.usuario.update({
       where: { id: userId },
@@ -39,6 +40,23 @@ export const authService = {
 
     const { password: _, ...userData } = updated;
     return { token, user: userData };
+  },
+
+  // Desde perfil (requiere verificar contraseña actual)
+  async cambiarContrasenaConVerificacion(userId: string, contrasenaActual: string, nuevaContrasena: string) {
+    const user = await prisma.usuario.findUnique({ where: { id: userId } });
+    if (!user) return { error: 'Usuario no encontrado', status: 404 };
+
+    if (!comparePassword(contrasenaActual, user.password)) {
+      return { error: 'La contraseña actual es incorrecta', status: 400 };
+    }
+
+    await prisma.usuario.update({
+      where: { id: userId },
+      data: { password: hashPassword(nuevaContrasena) },
+    });
+
+    return { success: true };
   },
 
   async getPerfil(userId: string) {
