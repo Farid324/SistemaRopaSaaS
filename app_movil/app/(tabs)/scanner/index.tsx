@@ -1,4 +1,4 @@
-// app_movil/app/(tabs)/scanner/index.tsx  (REEMPLAZA el existente)
+//app_movil/app/(tabs)/scanner/index.tsx
 
 import React, { useState, useCallback } from 'react';
 import {
@@ -14,19 +14,10 @@ import { useAuth } from '../../../src/context/AuthContext';
 import { Button } from '../../../src/components/ui/forms/button';
 import { Input } from '../../../src/components/ui/forms/input';
 import { ConfirmModal, ConfirmModalState, INITIAL_CONFIRM_STATE } from '../../../src/components/ui/overlays/confirm-modal';
-//import PaymentModal from '../../../../../../src/components/scanner/PaymentModal';
 import PaymentModal from '../../../src/components/scanner/PaymentModal';
 import api from '../../../src/services/api';
 
-interface Prenda {
-  id: string; marca?: string; tipo: string; codigo: string; tipoCodigo: string;
-  detalles?: string; foto?: string; precio: number; rebaja?: number;
-  sucursalId: string; estadoVenta: string;
-  sucursal?: { nombre: string };
-}
-
-type TipoCodigo = 'BARRAS' | 'QR' | 'MANUAL';
-type MetodoPago = 'EFECTIVO' | 'QR' | 'TARJETA';
+import { Prenda, TipoCodigo, MetodoPago, PaymentMethod } from '../../../src/types/scanner/types';
 
 export default function ScannerScreen() {
   const { colors } = useTheme();
@@ -36,6 +27,7 @@ export default function ScannerScreen() {
   const [activeTab, setActiveTab] = useState<TipoCodigo>('BARRAS');
   const [manualSearch, setManualSearch] = useState('');
   const [scanned, setScanned] = useState(false);
+  const [searching, setSearching] = useState(false);
   const [cart, setCart] = useState<Prenda[]>([]);
   const [lastFound, setLastFound] = useState<Prenda | null>(null);
   const [notFound, setNotFound] = useState(false);
@@ -47,30 +39,59 @@ export default function ScannerScreen() {
   const [processing, setProcessing] = useState(false);
   const [confirmModal, setConfirmModal] = useState<ConfirmModalState>(INITIAL_CONFIRM_STATE);
 
-  // Reset scanner when tab loses focus
-  useFocusEffect(useCallback(() => { return () => { setScanned(false); }; }, []));
+  // Clave: forzar remount de la cámara al volver al tab
+  const [cameraKey, setCameraKey] = useState(0);
+
+  useFocusEffect(
+    useCallback(() => {
+      // Al entrar al tab: resetear scan y forzar remount de cámara
+      setScanned(false);
+      setCameraKey((k) => k + 1);
+
+      return () => {
+        // Al salir del tab: limpiar estado de escaneo
+        setScanned(false);
+      };
+    }, [])
+  );
 
   if (!currentUser) return null;
 
-  const resetSearch = () => { setLastFound(null); setNotFound(false); setScannedCode(''); setManualSearch(''); setScanned(false); };
-  const resetAll = () => { resetSearch(); setCart([]); setVentaExitosa(false); setVentaId(''); setShowCart(false); };
+  const resetSearch = () => {
+    setLastFound(null);
+    setNotFound(false);
+    setScannedCode('');
+    setManualSearch('');
+    setScanned(false);
+    setSearching(false);
+  };
+
+  const resetAll = () => {
+    resetSearch();
+    setCart([]);
+    setVentaExitosa(false);
+    setVentaId('');
+    setShowCart(false);
+  };
 
   // ── Buscar prenda en backend ──
   const searchByCode = async (code: string) => {
     if (!code.trim()) return;
     setScannedCode(code);
+    setSearching(true);
     try {
-      const res = await api.get(`/prendas/codigo/${code}`);
+      const res = await api.get(`/prendas/codigo/${encodeURIComponent(code)}`);
       setLastFound(res.data);
       setNotFound(false);
     } catch {
       setLastFound(null);
       setNotFound(true);
     }
+    setSearching(false);
   };
 
   const handleBarCodeScanned = async ({ data }: { type: string; data: string }) => {
-    if (scanned) return;
+    if (scanned || searching) return;
     setScanned(true);
     await searchByCode(data);
   };
@@ -84,10 +105,10 @@ export default function ScannerScreen() {
   const removeFromCart = (id: string) => setCart((prev) => prev.filter((c) => c.id !== id));
   const total = cart.reduce((s, p) => s + (p.rebaja || p.precio), 0);
   const alreadyInCart = lastFound ? cart.some((c) => c.id === lastFound.id) : false;
-  const showScanArea = !lastFound && !notFound;
+  const showScanArea = !lastFound && !notFound && !searching;
 
-  // ── Confirmar venta con método de pago ──
-  const handleConfirmSale = async (metodosPago: { metodo: MetodoPago; monto: number }[]) => {
+  // ── Confirmar venta ──
+  const handleConfirmSale = async (metodosPago: PaymentMethod[]) => {
     setShowPayment(false);
     setProcessing(true);
     try {
@@ -114,7 +135,9 @@ export default function ScannerScreen() {
 
   const barcodeTypes = activeTab === 'QR'
     ? ['qr' as const]
-    : ['ean13' as const, 'ean8' as const, 'code128' as const, 'code39' as const, 'upc_a' as const, 'upc_e' as const];
+    : ['ean13' as const, 'ean8' as const, 'code128' as const, 'code39' as const, 'upc_a' as const, 'upc_e' as const, 'codabar' as const, 'itf14' as const];
+
+  const isBarras = activeTab === 'BARRAS';
 
   const tabs: { id: TipoCodigo; icon: keyof typeof Ionicons.glyphMap; label: string }[] = [
     { id: 'BARRAS', icon: 'barcode-outline', label: 'Barras' },
@@ -152,8 +175,16 @@ export default function ScannerScreen() {
         </View>
       )}
 
+      {/* Buscando... */}
+      {searching && (
+        <View style={[st.scanCard, { backgroundColor: colors.cdSolid, borderColor: colors.bd2Solid, padding: 40, alignItems: 'center' }]}>
+          <ActivityIndicator size="large" color={colors.acRose} />
+          <Text style={{ color: colors.tx3, fontSize: 13, marginTop: 12 }}>Buscando prenda...</Text>
+        </View>
+      )}
+
       {/* Scanner card */}
-      {!ventaExitosa && (
+      {!ventaExitosa && !searching && (
         <View style={[st.scanCard, { backgroundColor: colors.cdSolid, borderColor: colors.bd2Solid, ...colors.cardShadow }]}>
           {/* Tabs */}
           <View style={[st.tabsRow, { borderBottomColor: colors.bd }]}>
@@ -180,15 +211,24 @@ export default function ScannerScreen() {
                   </View>
                 ) : (
                   <View style={[st.cameraBox, { borderColor: colors.acRose, overflow: 'hidden' }]}>
-                    <CameraView style={StyleSheet.absoluteFillObject} facing="back"
+                    <CameraView
+                      key={`cam-${cameraKey}-${activeTab}`}
+                      style={StyleSheet.absoluteFillObject}
+                      facing="back"
                       barcodeScannerSettings={{ barcodeTypes }}
-                      onBarcodeScanned={scanned ? undefined : handleBarCodeScanned} />
+                      onBarcodeScanned={scanned ? undefined : handleBarCodeScanned}
+                    />
+                    {/* Overlay adaptativo */}
                     <View style={st.scanOverlay}>
-                      <View style={st.scanGuide}>
-                        <View style={[st.corner, st.cTL]} /><View style={[st.corner, st.cTR]} />
-                        <View style={[st.corner, st.cBL]} /><View style={[st.corner, st.cBR]} />
+                      <View style={[st.scanGuide, isBarras ? st.guideBarras : st.guideQR]}>
+                        <View style={[st.corner, st.cTL]} />
+                        <View style={[st.corner, st.cTR]} />
+                        <View style={[st.corner, st.cBL]} />
+                        <View style={[st.corner, st.cBR]} />
                       </View>
-                      <Text style={st.scanHint}>{activeTab === 'QR' ? 'Apunta al QR' : 'Apunta al código de barras'}</Text>
+                      <Text style={st.scanHint}>
+                        {isBarras ? 'Apunta al código de barras' : 'Apunta al código QR'}
+                      </Text>
                     </View>
                     {cart.length > 0 && (
                       <View style={st.cartBadgeOverlay}>
@@ -356,10 +396,8 @@ export default function ScannerScreen() {
         </View>
       </Modal>
 
-      {/* Payment Modal */}
       <PaymentModal visible={showPayment} total={total} itemCount={cart.length}
         onConfirm={handleConfirmSale} onCancel={() => setShowPayment(false)} />
-
       <ConfirmModal {...confirmModal} onCancel={() => setConfirmModal(INITIAL_CONFIRM_STATE)} />
     </ScrollView>
   );
@@ -377,14 +415,17 @@ const st = StyleSheet.create({
   tabsRow: { flexDirection: 'row', borderBottomWidth: 1 },
   tab: { flex: 1, alignItems: 'center', gap: 4, paddingVertical: 12 },
   cameraBox: { aspectRatio: 3 / 4, borderRadius: 18, borderWidth: 2, backgroundColor: '#000', alignItems: 'center', justifyContent: 'center' },
+  // Overlay adaptativo
   scanOverlay: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center' },
-  scanGuide: { width: 200, height: 200, position: 'relative' },
+  scanGuide: { position: 'relative' },
+  guideBarras: { width: 280, height: 100 },   // rectángulo horizontal
+  guideQR: { width: 200, height: 200 },        // cuadrado
   corner: { position: 'absolute', width: 28, height: 28, borderColor: '#fb7185' },
   cTL: { top: 0, left: 0, borderTopWidth: 3, borderLeftWidth: 3, borderTopLeftRadius: 8 },
   cTR: { top: 0, right: 0, borderTopWidth: 3, borderRightWidth: 3, borderTopRightRadius: 8 },
   cBL: { bottom: 0, left: 0, borderBottomWidth: 3, borderLeftWidth: 3, borderBottomLeftRadius: 8 },
   cBR: { bottom: 0, right: 0, borderBottomWidth: 3, borderRightWidth: 3, borderBottomRightRadius: 8 },
-  scanHint: { color: '#fff', fontSize: 12, marginTop: 16, textShadowColor: 'rgba(0,0,0,0.8)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4 },
+  scanHint: { color: '#fff', fontSize: 12, marginTop: 12, textAlign: 'center', textShadowColor: 'rgba(0,0,0,0.8)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4 },
   cartBadgeOverlay: { position: 'absolute', top: 12, right: 12, backgroundColor: 'rgba(251,113,133,0.9)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },
   foundBanner: { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 14, borderWidth: 1, padding: 12 },
   foundRow: { flexDirection: 'row', gap: 12, alignItems: 'flex-start' },

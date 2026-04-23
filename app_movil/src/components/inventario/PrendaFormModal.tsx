@@ -1,15 +1,16 @@
-// app_movil/app/(tabs)/inventario/components/PrendaFormModal.tsx
+// app_movil/src/components/inventario/PrendaFormModal.tsx
 
 import React, { useState } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Modal, Alert,
+  View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Modal, Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
 import { useTheme } from '../../context/ThemeContext';
-import { Switch } from '../ui/forms/switch';
-import { Button } from '../ui/forms/button';
-import { Input } from '../ui/forms/input';
-import type { Prenda, TipoCodigo, EstadoPrenda, Sucursal } from './types';
+import { Switch } from '../../components/ui/forms/switch';
+import { Button } from '../../components/ui/forms/button';
+import { Input } from '../../components/ui/forms/input';
+import type { Prenda, TipoCodigo, EstadoPrenda, Sucursal } from '../../types/inventario/types';
 
 interface Props {
   editing: Prenda | null;
@@ -26,23 +27,54 @@ export default function PrendaFormModal({ editing, scannedCode, scannedType, suc
   const { colors } = useTheme();
   const [marca, setMarca] = useState(editing?.marca || '');
   const [tipo, setTipo] = useState(editing?.tipo || '');
+  const [customTipo, setCustomTipo] = useState('');
   const [detalles, setDetalles] = useState(editing?.detalles || '');
   const [estado, setEstado] = useState(editing?.estado || 'NUEVO');
   const [precio, setPrecio] = useState(editing?.precio?.toString() || '');
   const [rebajaActiva, setRebajaActiva] = useState(!!editing?.rebaja);
   const [rebaja, setRebaja] = useState(editing?.rebaja?.toString() || '');
   const [sucursalId, setSucursalId] = useState(editing?.sucursalId || currentSucursalId || sucursales[0]?.id || '');
+  const [foto, setFoto] = useState<string | null>(editing?.foto || null);
   const [error, setError] = useState('');
 
-  const tipos = ['Blusa', 'Pantalón', 'Vestido', 'Falda', 'Short', 'Camisa', 'Chaqueta', 'Sudadera', 'Polera', 'Otro'];
+  const tiposPreset = ['Blusa', 'Pantalón', 'Vestido', 'Falda', 'Short', 'Camisa', 'Chaqueta', 'Sudadera', 'Polera'];
   const codeIcon: keyof typeof Ionicons.glyphMap = scannedType === 'BARRAS' ? 'barcode-outline' : scannedType === 'QR' ? 'qr-code-outline' : 'keypad-outline';
 
+  // ── Foto: cámara o galería ──
+  const pickFromCamera = async () => {
+    const perm = await ImagePicker.requestCameraPermissionsAsync();
+    if (!perm.granted) return;
+    const result = await ImagePicker.launchCameraAsync({ allowsEditing: true, aspect: [1, 1], quality: 0.7, base64: true });
+    if (!result.canceled && result.assets[0]) setFoto(result.assets[0].uri);
+  };
+
+  const pickFromGallery = async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({ allowsEditing: true, aspect: [1, 1], quality: 0.7 });
+    if (!result.canceled && result.assets[0]) setFoto(result.assets[0].uri);
+  };
+
+  const handleSelectTipo = (t: string) => {
+    setTipo(t);
+    setCustomTipo('');
+    setError('');
+  };
+
+  const handleCustomTipo = (v: string) => {
+    setCustomTipo(v);
+    setTipo(v);
+    setError('');
+  };
+
   const handleSave = () => {
-    if (!tipo || !precio) { setError('Completa los campos obligatorios'); return; }
+    const finalTipo = customTipo.trim() || tipo;
+    if (!finalTipo || !precio) { setError('Completa los campos obligatorios'); return; }
     onSave({
-      marca: marca || null, tipo, codigo: scannedCode, tipoCodigo: scannedType, detalles: detalles || null,
-      estado, precio: parseFloat(precio), rebaja: rebajaActiva && rebaja ? parseFloat(rebaja) : null,
-      sucursalId, estadoVenta: editing?.estadoVenta || 'DISPONIBLE', publicadoWeb: editing?.publicadoWeb || false,
+      marca: marca || null, tipo: finalTipo, codigo: scannedCode, tipoCodigo: scannedType,
+      detalles: detalles || null, estado, precio: parseFloat(precio),
+      rebaja: rebajaActiva && rebaja ? parseFloat(rebaja) : null,
+      sucursalId, estadoVenta: editing?.estadoVenta || 'DISPONIBLE',
+      publicadoWeb: editing?.publicadoWeb || false,
+      foto: foto || null,
     });
   };
 
@@ -67,40 +99,75 @@ export default function PrendaFormModal({ editing, scannedCode, scannedType, suc
               </View>
             )}
 
-            {/* Código escaneado */}
+            {/* Código */}
             <View style={[s.codeInfo, { backgroundColor: 'rgba(251,113,133,0.1)', borderColor: 'rgba(251,113,133,0.2)' }]}>
               <View style={[s.codeIconBox, { backgroundColor: 'rgba(251,113,133,0.15)' }]}>
                 <Ionicons name={codeIcon} size={20} color={colors.acRose} />
               </View>
-              <View>
-                <Text style={{ color: colors.acRose, fontSize: 12 }}>Código {scannedType}</Text>
-                <Text style={{ color: colors.tx4, fontSize: 10 }}>{scannedCode}</Text>
-              </View>
+              <View><Text style={{ color: colors.acRose, fontSize: 12 }}>Código {scannedType}</Text><Text style={{ color: colors.tx4, fontSize: 10 }}>{scannedCode}</Text></View>
             </View>
 
-            {/* Foto */}
+            {/* Foto real: cámara o galería */}
             <View>
               <Text style={[s.fieldLabel, { color: colors.tx3 }]}>Foto (Opcional)</Text>
-              <TouchableOpacity onPress={() => Alert.alert('Foto', 'Cámara/galería próximamente')} style={[s.photoBtn, { borderColor: colors.bd2Solid }]}>
-                <View style={[s.photoIcon, { backgroundColor: colors.fiSolid }]}>
-                  <Ionicons name="image-outline" size={24} color={colors.tx4} />
+              {foto ? (
+                <View style={s.photoPreviewWrap}>
+                  <Image source={{ uri: foto }} style={s.photoPreview} />
+                  <View style={s.photoActions}>
+                    <TouchableOpacity onPress={pickFromCamera} style={[s.photoActionBtn, { backgroundColor: 'rgba(56,189,248,0.1)', borderColor: 'rgba(56,189,248,0.2)' }]}>
+                      <Ionicons name="camera-outline" size={16} color={colors.acSky} />
+                      <Text style={{ color: colors.acSky, fontSize: 11 }}>Cambiar</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={() => setFoto(null)} style={[s.photoActionBtn, { backgroundColor: 'rgba(248,113,113,0.1)', borderColor: 'rgba(248,113,113,0.2)' }]}>
+                      <Ionicons name="trash-outline" size={16} color={colors.acRed} />
+                      <Text style={{ color: colors.acRed, fontSize: 11 }}>Quitar</Text>
+                    </TouchableOpacity>
+                  </View>
                 </View>
-                <Text style={{ color: colors.tx4, fontSize: 12 }}>Tomar foto</Text>
-              </TouchableOpacity>
+              ) : (
+                <View style={s.photoPickerRow}>
+                  <TouchableOpacity onPress={pickFromCamera} style={[s.photoPickerBtn, { borderColor: colors.bd2Solid }]}>
+                    <View style={[s.photoPickerIcon, { backgroundColor: 'rgba(56,189,248,0.1)' }]}>
+                      <Ionicons name="camera-outline" size={24} color={colors.acSky} />
+                    </View>
+                    <Text style={{ color: colors.tx3, fontSize: 11 }}>Cámara</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={pickFromGallery} style={[s.photoPickerBtn, { borderColor: colors.bd2Solid }]}>
+                    <View style={[s.photoPickerIcon, { backgroundColor: 'rgba(251,113,133,0.1)' }]}>
+                      <Ionicons name="images-outline" size={24} color={colors.acRose} />
+                    </View>
+                    <Text style={{ color: colors.tx3, fontSize: 11 }}>Galería</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
             </View>
 
             <Input label="Marca" placeholder="Bershka, Zara, H&M..." value={marca} onChangeText={(v) => { setMarca(v); setError(''); }} />
 
-            {/* Tipo */}
+            {/* Tipo: presets + input libre */}
             <View>
               <Text style={[s.fieldLabel, { color: colors.tx3 }]}>Tipo de prenda *</Text>
               <View style={s.tiposWrap}>
-                {tipos.map((t) => (
-                  <TouchableOpacity key={t} onPress={() => { setTipo(t); setError(''); }} activeOpacity={0.7}
-                    style={[s.tipoChip, { backgroundColor: tipo === t ? 'rgba(251,113,133,0.15)' : colors.fiSolid, borderColor: tipo === t ? 'rgba(251,113,133,0.25)' : colors.bd }]}>
-                    <Text style={{ color: tipo === t ? colors.acRose : colors.tx4, fontSize: 12 }}>{t}</Text>
+                {tiposPreset.map((t) => (
+                  <TouchableOpacity key={t} onPress={() => handleSelectTipo(t)} activeOpacity={0.7}
+                    style={[s.tipoChip, {
+                      backgroundColor: tipo === t && !customTipo ? 'rgba(251,113,133,0.15)' : colors.fiSolid,
+                      borderColor: tipo === t && !customTipo ? 'rgba(251,113,133,0.25)' : colors.bd,
+                    }]}>
+                    <Text style={{ color: tipo === t && !customTipo ? colors.acRose : colors.tx4, fontSize: 12 }}>{t}</Text>
                   </TouchableOpacity>
                 ))}
+              </View>
+              {/* Input libre para tipo personalizado */}
+              <View style={[s.customTipoWrap, { borderColor: customTipo ? 'rgba(251,113,133,0.25)' : colors.bd, backgroundColor: colors.fiSolid }]}>
+                <Ionicons name="create-outline" size={16} color={customTipo ? colors.acRose : colors.tx4} />
+                <TextInput
+                  style={{ flex: 1, color: colors.tx, fontSize: 13 }}
+                  placeholder="O escribe un tipo personalizado..."
+                  placeholderTextColor={colors.tx4}
+                  value={customTipo}
+                  onChangeText={handleCustomTipo}
+                />
               </View>
             </View>
 
@@ -172,7 +239,7 @@ export default function PrendaFormModal({ editing, scannedCode, scannedType, suc
               )}
             </View>
 
-            {/* Online (disabled) */}
+            {/* Online */}
             <View style={[s.rebajaBox, { backgroundColor: colors.fiSolid, borderColor: colors.bd, opacity: 0.4 }]}>
               <View style={s.rebajaHeader}>
                 <View><Text style={{ color: colors.tx4, fontSize: 13 }}>Publicar en Tienda Online</Text><Text style={{ color: colors.tx4, fontSize: 10 }}>Próximamente</Text></View>
@@ -199,10 +266,18 @@ const s = StyleSheet.create({
   codeInfo: { flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: 14, borderWidth: 1, padding: 12 },
   codeIconBox: { width: 40, height: 40, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   fieldLabel: { fontSize: 12, fontWeight: '500', marginBottom: 6 },
-  photoBtn: { height: 140, borderRadius: 18, borderWidth: 2, borderStyle: 'dashed', alignItems: 'center', justifyContent: 'center', gap: 8 },
-  photoIcon: { width: 48, height: 48, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
-  tiposWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  // Foto
+  photoPickerRow: { flexDirection: 'row', gap: 12 },
+  photoPickerBtn: { flex: 1, height: 110, borderRadius: 18, borderWidth: 2, borderStyle: 'dashed', alignItems: 'center', justifyContent: 'center', gap: 8 },
+  photoPickerIcon: { width: 48, height: 48, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+  photoPreviewWrap: { gap: 10 },
+  photoPreview: { width: '100%', height: 180, borderRadius: 18, resizeMode: 'cover' },
+  photoActions: { flexDirection: 'row', gap: 10 },
+  photoActionBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderRadius: 12, borderWidth: 1, paddingVertical: 10 },
+  // Tipo
+  tiposWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 8 },
   tipoChip: { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 12, borderWidth: 1 },
+  customTipoWrap: { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 14, borderWidth: 1, height: 44, paddingHorizontal: 14 },
   textarea: { borderRadius: 14, borderWidth: 1, padding: 14, fontSize: 13, minHeight: 70, textAlignVertical: 'top' },
   estadoBtn: { flex: 1, paddingVertical: 10, borderRadius: 14, borderWidth: 1, alignItems: 'center', gap: 2 },
   priceWrap: { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 14, borderWidth: 1, height: 48, paddingHorizontal: 14 },

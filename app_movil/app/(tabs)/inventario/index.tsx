@@ -12,7 +12,7 @@ import { useTheme } from '../../../src/context/ThemeContext';
 import { useAuth } from '../../../src/context/AuthContext';
 import { ConfirmModal, ConfirmModalState, INITIAL_CONFIRM_STATE } from '../../../src/components/ui/overlays/confirm-modal';
 import api from '../../../src/services/api';
-import type { Prenda, Sucursal, TipoCodigo, EstadoVenta } from '../../../src/components/inventario/types';
+import type { Prenda, Sucursal, TipoCodigo, EstadoVenta } from '../../../src/types/inventario/types';
 import ScannerModal from '../../../src/components/inventario/ScannerModal';
 import PrendaFormModal from '../../../src/components/inventario/PrendaFormModal';
 import PrendaViewModal from '../../../src/components/inventario/PrendaViewModal';

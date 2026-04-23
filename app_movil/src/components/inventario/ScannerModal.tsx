@@ -1,4 +1,4 @@
-// app_movil/app/(tabs)/inventario/components/ScannerModal.tsx
+// app_movil/src/components/inventario/ScannerModal.tsx  (REEMPLAZA el existente)
 
 import React, { useState } from 'react';
 import {
@@ -8,9 +8,9 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { useTheme } from '../../context/ThemeContext';
-import { Button } from '../ui/forms/button';
-import { Input } from '../ui/forms/input';
-import type { TipoCodigo } from './types';
+import { Button } from '../../components/ui/forms/button';
+import { Input } from '../../components/ui/forms/input';
+import type { TipoCodigo } from '../../types/inventario/types';
 
 interface Props {
   buscarPorCodigo: (c: string) => Promise<boolean>;
@@ -54,11 +54,12 @@ export default function ScannerModal({ buscarPorCodigo, onCodeScanned, onClose }
     ? ['qr' as const]
     : ['ean13' as const, 'ean8' as const, 'code128' as const, 'code39' as const, 'upc_a' as const, 'upc_e' as const, 'codabar' as const, 'itf14' as const];
 
+  const isBarras = activeTab === 'BARRAS';
+
   return (
     <Modal visible transparent animationType="slide">
       <View style={[s.overlay, { backgroundColor: colors.ov }]}>
         <View style={[s.sheet, { backgroundColor: colors.cdSolid, borderColor: colors.bd2Solid }]}>
-          {/* Header */}
           <View style={[s.header, { borderBottomColor: colors.bd }]}>
             <View>
               <Text style={[s.headerTitle, { color: colors.tx }]}>Paso 1: Escanear Código</Text>
@@ -69,7 +70,6 @@ export default function ScannerModal({ buscarPorCodigo, onCodeScanned, onClose }
             </TouchableOpacity>
           </View>
 
-          {/* Tabs */}
           <View style={[s.tabsRow, { borderBottomColor: colors.bd }]}>
             {tabs.map((tab) => (
               <TouchableOpacity key={tab.id} onPress={() => { setActiveTab(tab.id); resetScan(); }}
@@ -81,7 +81,6 @@ export default function ScannerModal({ buscarPorCodigo, onCodeScanned, onClose }
           </View>
 
           <ScrollView contentContainerStyle={{ padding: 20, gap: 16 }}>
-            {/* Camera real */}
             {activeTab !== 'MANUAL' && !result && (
               <>
                 {!permission?.granted ? (
@@ -100,16 +99,16 @@ export default function ScannerModal({ buscarPorCodigo, onCodeScanned, onClose }
                       barcodeScannerSettings={{ barcodeTypes }}
                       onBarcodeScanned={scanned ? undefined : handleBarCodeScanned}
                     />
-                    {/* Overlay centrado */}
                     <View style={s.scanOverlay}>
-                      <View style={s.scanGuide}>
+                      {/* Guía adaptativa: horizontal para barras, cuadrado para QR */}
+                      <View style={[s.scanGuide, isBarras ? s.guideBarras : s.guideQR]}>
                         <View style={[s.corner, s.cornerTL]} />
                         <View style={[s.corner, s.cornerTR]} />
                         <View style={[s.corner, s.cornerBL]} />
                         <View style={[s.corner, s.cornerBR]} />
                       </View>
                       <Text style={s.scanHint}>
-                        {activeTab === 'QR' ? 'Apunta al código QR' : 'Apunta al código de barras'}
+                        {isBarras ? 'Apunta al código de barras' : 'Apunta al código QR'}
                       </Text>
                     </View>
                   </View>
@@ -117,7 +116,6 @@ export default function ScannerModal({ buscarPorCodigo, onCodeScanned, onClose }
               </>
             )}
 
-            {/* Manual input */}
             {activeTab === 'MANUAL' && !result && (
               <>
                 <View style={[s.infoBanner, { backgroundColor: 'rgba(251,113,133,0.1)', borderColor: 'rgba(251,113,133,0.2)' }]}>
@@ -130,7 +128,6 @@ export default function ScannerModal({ buscarPorCodigo, onCodeScanned, onClose }
               </>
             )}
 
-            {/* Resultado */}
             {result && (
               <>
                 <View style={[s.resultBox, {
@@ -176,22 +173,17 @@ const s = StyleSheet.create({
   tabsRow: { flexDirection: 'row', borderBottomWidth: 1 },
   tab: { flex: 1, alignItems: 'center', gap: 4, paddingVertical: 12 },
   cameraBox: { aspectRatio: 3 / 4, borderRadius: 18, borderWidth: 2, backgroundColor: '#000', alignItems: 'center', justifyContent: 'center' },
-  // ── Overlay centrado sobre la cámara ──
-  scanOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    alignItems: 'center',
-    justifyContent: 'center', // centrado vertical
-  },
-  scanGuide: { width: 200, height: 200, position: 'relative' },
+  scanOverlay: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center' },
+  // Guía adaptativa
+  scanGuide: { position: 'relative' },
+  guideBarras: { width: 280, height: 100 },  // rectángulo horizontal para código de barras
+  guideQR: { width: 200, height: 200 },       // cuadrado para QR
   corner: { position: 'absolute', width: 28, height: 28, borderColor: '#fb7185' },
   cornerTL: { top: 0, left: 0, borderTopWidth: 3, borderLeftWidth: 3, borderTopLeftRadius: 8 },
   cornerTR: { top: 0, right: 0, borderTopWidth: 3, borderRightWidth: 3, borderTopRightRadius: 8 },
   cornerBL: { bottom: 0, left: 0, borderBottomWidth: 3, borderLeftWidth: 3, borderBottomLeftRadius: 8 },
   cornerBR: { bottom: 0, right: 0, borderBottomWidth: 3, borderRightWidth: 3, borderBottomRightRadius: 8 },
-  scanHint: {
-    color: '#fff', fontSize: 12, marginTop: 16, textAlign: 'center',
-    textShadowColor: 'rgba(0,0,0,0.8)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4,
-  },
+  scanHint: { color: '#fff', fontSize: 12, marginTop: 12, textAlign: 'center', textShadowColor: 'rgba(0,0,0,0.8)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4 },
   infoBanner: { borderRadius: 14, borderWidth: 1, padding: 12 },
   resultBox: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, padding: 16, borderRadius: 18, borderWidth: 1 },
   retryBtn: { flex: 1, height: 48, borderRadius: 14, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },

@@ -1,4 +1,4 @@
-// app_movil/src/components/scanner/PaymentModal.tsx
+//app_movil/src/components/scanner/PaymentModal.tsx
 
 import React, { useState } from 'react';
 import {
@@ -7,13 +7,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../context/ThemeContext';
-
-type MetodoPago = 'EFECTIVO' | 'QR' | 'TARJETA';
-
-interface PaymentMethod {
-  metodo: MetodoPago;
-  monto: number;
-}
+import { MetodoPago, PaymentMethod } from '../../types/scanner/types';
 
 interface Props {
   visible: boolean;

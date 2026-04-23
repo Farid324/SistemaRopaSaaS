@@ -1,10 +1,10 @@
-// app_movil/app/(tabs)/inventario/components/PrendaViewModal.tsx
+// app_movil/src/components/inventario/PrendaViewModal.tsx
 
 import React from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../context/ThemeContext';
-import type { Prenda } from './types';
+import type { Prenda } from '../../types/inventario/types';
 
 interface Props {
   prenda: Prenda;

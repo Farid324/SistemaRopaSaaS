@@ -1,4 +1,4 @@
-// app_movil/app/(tabs)/inventario/types.ts
+//app_movil/src/types/inventario/types.ts
 
 export type TipoCodigo = 'BARRAS' | 'QR' | 'MANUAL';
 export type EstadoPrenda = 'NUEVO' | 'SEMI_NUEVO' | 'USADO';

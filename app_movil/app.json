@@ -45,7 +45,8 @@
         {
           "cameraPermission": "Permitir a Boutique App usar la cámara para escanear códigos"
         }
-      ]
+      ],
+      "@react-native-community/datetimepicker"
     ],
     "experiments": {
       "typedRoutes": true,
