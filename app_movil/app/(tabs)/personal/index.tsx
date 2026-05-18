@@ -3,7 +3,7 @@
 import React, { useState, useCallback } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  Modal, ActivityIndicator, RefreshControl,
+  Modal, ActivityIndicator, RefreshControl, Alert,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -102,7 +102,11 @@ export default function PersonalScreen() {
         try {
           await api.delete(`/usuarios/${user.id}`);
           fetchData();
-        } catch (error) { console.error('Error eliminando:', error); }
+        } catch (error: any) { 
+            const msg = error.response?.data?.message || 'No se pudo eliminar el usuario';
+            Alert.alert('Error', msg);
+            console.error('Error eliminando:', error); 
+          }
         setConfirmModal(INITIAL_CONFIRM_STATE);
       },
     });
@@ -181,11 +185,11 @@ export default function PersonalScreen() {
                       </View>
                       {u.sucursal ? (
                         <Text style={{ color: colors.tx4, fontSize: 9 }}>{u.sucursal.nombre}</Text>
-                      ) : u.sucursalId ? (
+                      ) : (
                         <View style={[st.pill, { backgroundColor: 'rgba(251,191,36,0.15)', borderColor: 'rgba(251,191,36,0.2)' }]}>
                           <Text style={{ color: colors.acAmber, fontSize: 9 }}>Sin sucursal</Text>
                         </View>
-                      ) : null}
+                      )}
                     </View>
                   </View>
                 </View>

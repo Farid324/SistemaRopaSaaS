@@ -43,11 +43,8 @@ export default function SucursalesScreen() {
 
   const handleDelete = async () => {
     if (!deletingSuc) return;
-    try { 
-      await api.delete(`/sucursales/${deletingSuc.id}`); 
-      fetchSucursales(); 
-    }
-    catch (error) { console.error('Error eliminando:', error); }
+    await api.delete(`/sucursales/${deletingSuc.id}`);
+    fetchSucursales();
     setDeletingSuc(null);
   };
 

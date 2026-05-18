@@ -2,7 +2,7 @@
  * Learn more about light and dark modes:
  * https://docs.expo.dev/guides/color-schemes/
  */
-
+// app_movil/src/hooks/use-theme-color.ts
 import { Colors } from '@/src/constants/theme';
 import { useColorScheme } from '@/src/hooks/use-color-scheme';
 

@@ -1,6 +1,7 @@
 // app_movil/src/context/AuthContext.tsx  (REEMPLAZA el existente)
 
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
+import { File } from 'expo-file-system/next';
 import api, { tokenStorage } from '../services/api';
 
 export type Rol = 'SUPER_ADMIN' | 'OWNER_PRINCIPAL' | 'CO_OWNER' | 'ADMINISTRADOR' | 'EMPLEADO';
@@ -30,7 +31,7 @@ interface AuthState {
   isLoading: boolean;
   isRestoring: boolean;
   error: string | null;
-  profilePhoto: string | null; // Foto de perfil local (URI)
+  profilePhoto: string | null;
   login: (correo: string, password: string) => Promise<boolean>;
   logout: () => Promise<void>;
   cambiarPassword: (nuevaPassword: string) => Promise<boolean>;
@@ -46,7 +47,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(false);
   const [isRestoring, setIsRestoring] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [profilePhoto, setProfilePhoto] = useState<string | null>(null);
+  const [profilePhoto, setProfilePhotoState] = useState<string | null>(null);
 
   useEffect(() => { restoreSession(); }, []);
 
@@ -56,13 +57,41 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (!token) { setIsRestoring(false); return; }
       const response = await api.get('/auth/me');
       setCurrentUser(response.data);
-      if (response.data.fotoPerfil) setProfilePhoto(response.data.fotoPerfil);
+      // Si hay foto en el backend, usarla
+      if (response.data.fotoPerfil) {
+        setProfilePhotoState(response.data.fotoPerfil);
+      }
     } catch {
       await tokenStorage.remove();
     } finally {
       setIsRestoring(false);
     }
   };
+
+  // ═══════════════════ PUNTO 1: Foto de perfil persistente ═══════════════════
+  const setProfilePhoto = useCallback(async (uri: string | null) => {
+    setProfilePhotoState(uri);
+
+    try {
+      let base64Data: string | null = null;
+
+      if (uri) {
+        // Convertir la imagen a base64 usando la nueva File API
+        const file = new File(uri);
+        const base64 = file.base64();
+        // Detectar tipo de imagen
+        const extension = uri.split('.').pop()?.toLowerCase() || 'jpeg';
+        const mimeType = extension === 'png' ? 'image/png' : 'image/jpeg';
+        base64Data = `data:${mimeType};base64,${base64}`;
+      }
+
+      // Enviar al backend
+      await api.post('/auth/actualizar-foto', { fotoPerfil: base64Data });
+    } catch (error) {
+      console.error('Error subiendo foto de perfil:', error);
+      // La foto local se mantiene para UX, pero no persistirá
+    }
+  }, []);
 
   const login = useCallback(async (correo: string, password: string): Promise<boolean> => {
     setIsLoading(true);
@@ -72,7 +101,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const { token, user } = response.data;
       await tokenStorage.save(token);
       setCurrentUser(user);
-      if (user.fotoPerfil) setProfilePhoto(user.fotoPerfil);
+      if (user.fotoPerfil) setProfilePhotoState(user.fotoPerfil);
+      else setProfilePhotoState(null);
       setIsLoading(false);
       return true;
     } catch (err: any) {
@@ -102,7 +132,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const logout = useCallback(async () => {
     await tokenStorage.remove();
     setCurrentUser(null);
-    setProfilePhoto(null);
+    setProfilePhotoState(null);
     setError(null);
   }, []);
 
@@ -110,7 +140,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const response = await api.get('/auth/me');
       setCurrentUser(response.data);
-      if (response.data.fotoPerfil) setProfilePhoto(response.data.fotoPerfil);
+      if (response.data.fotoPerfil) setProfilePhotoState(response.data.fotoPerfil);
     } catch {}
   }, []);
 

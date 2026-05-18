@@ -8,5 +8,5 @@ export interface Sucursal {
   estado: string;
   horarios?: string;
   maxAdministradores: number;
-  _count?: { usuarios: number; prendas: number };
+  _count?: { usuarios: number; prendas: number; ventas: number };
 }
