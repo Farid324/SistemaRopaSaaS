@@ -59,6 +59,18 @@ export const authService = {
     return { success: true };
   },
 
+  // ═══════════════════ PUNTO 1: Foto de perfil persistente ═══════════════════
+  async actualizarFotoPerfil(userId: string, fotoPerfil: string | null) {
+    const updated = await prisma.usuario.update({
+      where: { id: userId },
+      data: { fotoPerfil },
+      select: {
+        id: true, nombreCompleto: true, fotoPerfil: true,
+      },
+    });
+    return { message: 'Foto actualizada', fotoPerfil: updated.fotoPerfil };
+  },
+
   async getPerfil(userId: string) {
     return prisma.usuario.findUnique({
       where: { id: userId },

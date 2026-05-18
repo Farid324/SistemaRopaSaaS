@@ -39,17 +39,48 @@ export const sucursalesController = {
     }
   },
 
+  /**
+   * Devuelve conteos de datos asociados a una sucursal (para el modal de confirmación).
+   */
+  async deleteInfo(req: Request, res: Response) {
+    try {
+      const id = asString(req.params.id);
+      if (!id) return res.status(400).json({ message: 'ID requerido' });
+
+      const info = await sucursalesService.getDeleteInfo(id);
+      res.json(info);
+    } catch (error: any) {
+      if (error.code === 'NOT_FOUND') return res.status(404).json({ message: error.message });
+      console.error('Delete info error:', error);
+      res.status(500).json({ message: 'Error al obtener información' });
+    }
+  },
+
+  /**
+   * Devuelve prendas y ventas de una sucursal para exportar antes de eliminar.
+   */
+  async exportData(req: Request, res: Response) {
+    try {
+      const id = asString(req.params.id);
+      if (!id) return res.status(400).json({ message: 'ID requerido' });
+
+      const data = await sucursalesService.getExportData(id);
+      res.json(data);
+    } catch (error) {
+      console.error('Export data error:', error);
+      res.status(500).json({ message: 'Error al exportar datos' });
+    }
+  },
+
   async remove(req: Request, res: Response) {
     try {
       const id = asString(req.params.id);
       if (!id) return res.status(400).json({ message: 'ID requerido' });
 
       await sucursalesService.remove(id);
-      res.json({ message: 'Sucursal eliminada' });
+      res.json({ message: 'Sucursal eliminada correctamente' });
     } catch (error: any) {
-      if (error.code === 'P2003') {
-        return res.status(400).json({ message: 'No se puede eliminar: tiene datos asociados' });
-      }
+      if (error.code === 'NOT_FOUND') return res.status(404).json({ message: error.message });
       console.error('Delete sucursal error:', error);
       res.status(500).json({ message: 'Error al eliminar sucursal' });
     }

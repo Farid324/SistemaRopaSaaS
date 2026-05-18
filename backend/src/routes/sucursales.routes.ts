@@ -11,6 +11,8 @@ const router = Router();
 router.use(authMiddleware);
 
 router.get('/', anyRole, filterByEmpresa, sucursalesController.list);
+router.get('/:id/delete-info', onlyOwners, sucursalesController.deleteInfo);
+router.get('/:id/export-data', onlyOwners, sucursalesController.exportData);
 router.post('/', onlyOwners, sucursalesController.create);
 router.put('/:id', onlyOwners, sucursalesController.update);
 router.delete('/:id', onlyOwners, sucursalesController.remove);

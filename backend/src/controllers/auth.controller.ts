@@ -56,6 +56,18 @@ export const authController = {
       res.status(500).json({ message: 'Error al cambiar contraseña' });
     }
   },
+  // ═══════════════════ PUNTO 1: Foto de perfil persistente ═══════════════════
+  async actualizarFoto(req: Request, res: Response) {
+    try {
+      const { fotoPerfil } = req.body;
+      // fotoPerfil puede ser un string base64 (data:image/...) o null para quitar
+      const result = await authService.actualizarFotoPerfil(req.user!.userId, fotoPerfil || null);
+      res.json(result);
+    } catch (error) {
+      console.error('Actualizar foto error:', error);
+      res.status(500).json({ message: 'Error al actualizar foto de perfil' });
+    }
+  },
 
   async me(req: Request, res: Response) {
     try {
