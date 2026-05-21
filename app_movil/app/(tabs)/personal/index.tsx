@@ -59,9 +59,10 @@ export default function PersonalScreen() {
 
   const onRefresh = () => { setRefreshing(true); fetchData(); };
 
-  // Filtrar: owner ve todos, admin solo empleados de su sucursal
+  // Filtrar: owner ve todos (excepto OWNER_PRINCIPAL y a sí mismo), admin solo empleados de su sucursal
+  // OWNER_PRINCIPAL nunca aparece en la lista — es el dueño, no personal gestionable
   const filtered = isOwner
-    ? usuarios.filter((u) => u.id !== currentUser.id)
+    ? usuarios.filter((u) => u.id !== currentUser.id && u.rol !== 'OWNER_PRINCIPAL')
     : usuarios.filter((u) => u.rol === 'EMPLEADO' && u.sucursalId === currentUser.sucursalId);
 
   // ── Acciones con backend ──
@@ -193,17 +194,36 @@ export default function PersonalScreen() {
                     </View>
                   </View>
                 </View>
-                <View style={{ flexDirection: 'row', gap: 4 }}>
-                  <TouchableOpacity onPress={() => handleToggleEstado(u)} style={[st.iconBtn, { backgroundColor: colors.fiSolid, borderColor: colors.bd }]}>
-                    <Ionicons name={u.estado === 'ACTIVO' ? 'shield-outline' : 'shield-checkmark-outline'} size={16} color={u.estado === 'ACTIVO' ? colors.acAmber : colors.acEmerald} />
-                  </TouchableOpacity>
-                  <TouchableOpacity onPress={() => { setEditing(u); setShowForm(true); }} style={[st.iconBtn, { backgroundColor: 'rgba(56,189,248,0.1)', borderColor: 'rgba(56,189,248,0.2)' }]}>
-                    <Ionicons name="create-outline" size={16} color={colors.acSky} />
-                  </TouchableOpacity>
-                  <TouchableOpacity onPress={() => handleDelete(u)} style={[st.iconBtn, { backgroundColor: 'rgba(248,113,113,0.1)', borderColor: 'rgba(248,113,113,0.2)' }]}>
-                    <Ionicons name="trash-outline" size={16} color={colors.acRed} />
-                  </TouchableOpacity>
-                </View>
+                {(() => {
+                  const myRol = currentUser.rol;
+                  const targetRol = u.rol;
+                  // ¿Puede gestionar (bloquear/eliminar) a este usuario?
+                  const canManage =
+                    myRol === 'SUPER_ADMIN' ||
+                    myRol === 'OWNER_PRINCIPAL' ||
+                    (myRol === 'CO_OWNER' && targetRol !== 'OWNER_PRINCIPAL' && targetRol !== 'CO_OWNER') ||
+                    (myRol === 'ADMINISTRADOR' && targetRol === 'EMPLEADO');
+
+                  return (
+                    <View style={{ flexDirection: 'row', gap: 4 }}>
+                      {canManage && (
+                        <TouchableOpacity onPress={() => handleToggleEstado(u)} style={[st.iconBtn, { backgroundColor: colors.fiSolid, borderColor: colors.bd }]}>
+                          <Ionicons name={u.estado === 'ACTIVO' ? 'shield-outline' : 'shield-checkmark-outline'} size={16} color={u.estado === 'ACTIVO' ? colors.acAmber : colors.acEmerald} />
+                        </TouchableOpacity>
+                      )}
+                      {canManage && (
+                        <TouchableOpacity onPress={() => { setEditing(u); setShowForm(true); }} style={[st.iconBtn, { backgroundColor: 'rgba(56,189,248,0.1)', borderColor: 'rgba(56,189,248,0.2)' }]}>
+                          <Ionicons name="create-outline" size={16} color={colors.acSky} />
+                        </TouchableOpacity>
+                      )}
+                      {canManage && (
+                        <TouchableOpacity onPress={() => handleDelete(u)} style={[st.iconBtn, { backgroundColor: 'rgba(248,113,113,0.1)', borderColor: 'rgba(248,113,113,0.2)' }]}>
+                          <Ionicons name="trash-outline" size={16} color={colors.acRed} />
+                        </TouchableOpacity>
+                      )}
+                    </View>
+                  );
+                })()}
               </View>
             </View>
           );
@@ -215,6 +235,7 @@ export default function PersonalScreen() {
         <PersonalFormModal
           colors={colors}
           isOwner={isOwner}
+          currentUserRol={currentUser.rol}
           editing={editing}
           sucursales={sucursales}
           currentSucursalId={currentUser.sucursalId}

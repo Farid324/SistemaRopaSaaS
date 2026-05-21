@@ -12,6 +12,7 @@ import { Usuario, Sucursal, Rol } from '../../types/personal/types';
 interface PersonalFormModalProps {
   colors: any;
   isOwner: boolean;
+  currentUserRol: string;
   editing: Usuario | null;
   sucursales: Sucursal[];
   currentSucursalId?: string;
@@ -19,7 +20,7 @@ interface PersonalFormModalProps {
   onClose: () => void;
 }
 
-export function PersonalFormModal({ colors, isOwner, editing, sucursales, currentSucursalId, onSave, onClose }: PersonalFormModalProps) {
+export function PersonalFormModal({ colors, isOwner, currentUserRol, editing, sucursales, currentSucursalId, onSave, onClose }: PersonalFormModalProps) {
   const editingSucursalExists = editing?.sucursalId ? sucursales.some((s) => s.id === editing.sucursalId) : false;
 
   const [form, setForm] = useState({
@@ -34,9 +35,16 @@ export function PersonalFormModal({ colors, isOwner, editing, sucursales, curren
   });
   const [error, setError] = useState('');
 
-  const roles: { v: Rol; l: string }[] = isOwner
-    ? [{ v: 'CO_OWNER', l: 'Dueño' }, { v: 'ADMINISTRADOR', l: 'Admin' }, { v: 'EMPLEADO', l: 'Empleado' }]
-    : [{ v: 'EMPLEADO', l: 'Empleado' }];
+  // Roles que puede crear según la jerarquía:
+  // OWNER_PRINCIPAL → CO_OWNER, ADMIN, EMPLEADO
+  // CO_OWNER → ADMIN, EMPLEADO (NO puede crear otro CO_OWNER)
+  // ADMIN → EMPLEADO
+  const roles: { v: Rol; l: string }[] =
+    currentUserRol === 'OWNER_PRINCIPAL' || currentUserRol === 'SUPER_ADMIN'
+      ? [{ v: 'CO_OWNER', l: 'Dueño' }, { v: 'ADMINISTRADOR', l: 'Admin' }, { v: 'EMPLEADO', l: 'Empleado' }]
+      : currentUserRol === 'CO_OWNER'
+        ? [{ v: 'ADMINISTRADOR', l: 'Admin' }, { v: 'EMPLEADO', l: 'Empleado' }]
+        : [{ v: 'EMPLEADO', l: 'Empleado' }];
 
   const needsSucursal = form.rol !== 'CO_OWNER' && form.rol !== 'OWNER_PRINCIPAL';
 
