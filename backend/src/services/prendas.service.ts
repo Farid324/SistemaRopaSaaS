@@ -48,6 +48,10 @@ export const prendasService = {
     return prisma.prenda.update({ where: { id }, data });
   },
 
+  async findById(id: string) {
+    return prisma.prenda.findUnique({ where: { id } });
+  },
+
   async remove(id: string) {
     return prisma.prenda.delete({ where: { id } });
   },

@@ -2,6 +2,7 @@
 
 import { prisma } from '../config/prisma';
 import { hashPassword } from '../config/auth';
+import { sendWelcomeEmail } from './email.service';
 
 const USUARIO_SELECT = {
   id: true, nombreCompleto: true, ci: true, correo: true, telefono: true,
@@ -24,8 +25,8 @@ export const usuariosService = {
     });
   },
 
-  async create(data: any, empresaId: string, defaultSucursalId?: string) {
-    return prisma.usuario.create({
+  async create(data: any, empresaId: string, defaultSucursalId?: string, registradorId?: string) {
+    const usuario = await prisma.usuario.create({
       data: {
         nombreCompleto: data.nombreCompleto,
         ci: data.ci,
@@ -42,6 +43,33 @@ export const usuariosService = {
       },
       select: USUARIO_SELECT,
     });
+
+    // ── Enviar correo de bienvenida (no bloqueante) ──
+    const [empresa, registrador] = await Promise.all([
+      prisma.empresa.findUnique({
+        where: { id: empresaId },
+        select: { nombre: true },
+      }),
+      registradorId
+        ? prisma.usuario.findUnique({
+            where: { id: registradorId },
+            select: { nombreCompleto: true, rol: true },
+          })
+        : null,
+    ]);
+
+    sendWelcomeEmail({
+      destinatario: data.correo,
+      nombreCompleto: data.nombreCompleto,
+      rol: data.rol,
+      edad: data.edad || null,
+      nombreEmpresa: empresa?.nombre || 'Tu Empresa',
+      contrasena: data.ci,
+      registradoPor: registrador?.nombreCompleto || 'Administración',
+      rolRegistrador: registrador?.rol || 'OWNER_PRINCIPAL',
+    }).catch((err) => console.error('Error en email de bienvenida:', err));
+
+    return usuario;
   },
 
   async update(id: string, data: any) {

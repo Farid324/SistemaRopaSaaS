@@ -4,13 +4,12 @@ import { Router } from 'express';
 import { sucursalesController } from '../controllers/sucursales.controller';
 import { authMiddleware } from '../shared/middlewares/authMiddleware';
 import { onlyOwners, anyRole } from '../shared/middlewares/roleMiddleware';
-import { filterByEmpresa } from '../shared/middlewares/empresaMiddleware';
 
 const router = Router();
 
 router.use(authMiddleware);
 
-router.get('/', anyRole, filterByEmpresa, sucursalesController.list);
+router.get('/', anyRole, sucursalesController.list);
 router.get('/:id/delete-info', onlyOwners, sucursalesController.deleteInfo);
 router.get('/:id/export-data', onlyOwners, sucursalesController.exportData);
 router.post('/', onlyOwners, sucursalesController.create);

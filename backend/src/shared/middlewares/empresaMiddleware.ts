@@ -1,26 +1,10 @@
 // backend/src/shared/middlewares/empresaMiddleware.ts
-
-import { Request, Response, NextFunction } from 'express';
-import { isOwnerRole } from '../helpers';
-
-/**
- * Fuerza que el usuario solo vea datos de SU empresa.
- * Inyecta req.query.empresaId automáticamente.
- */
-export function filterByEmpresa(req: Request, _res: Response, next: NextFunction) {
-  if (req.user) req.query.empresaId = req.user.empresaId;
-  next();
-}
-
-/**
- * Filtra por empresa y, si NO es owner, también por su sucursal.
- */
-export function filterBySucursal(req: Request, _res: Response, next: NextFunction) {
-  if (req.user) {
-    req.query.empresaId = req.user.empresaId;
-    if (!isOwnerRole(req.user.rol) && req.user.sucursalId) {
-      req.query.sucursalId = req.user.sucursalId;
-    }
-  }
-  next();
-}
+//
+// NOTA: Los filtros filterByEmpresa y filterBySucursal se eliminaron porque
+// Express 5 tiene req.query de solo lectura (getter) y las mutaciones no persisten.
+//
+// En su lugar, cada controller lee req.user.empresaId directamente del JWT.
+// Este archivo se mantiene como documentación del cambio.
+//
+// Referencia del bug: Express 5 req.query returns a new parsed object each time,
+// so property assignments like req.query.empresaId = ... are silently lost.

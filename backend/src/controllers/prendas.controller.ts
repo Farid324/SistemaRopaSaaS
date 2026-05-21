@@ -7,12 +7,20 @@ import { asString, isOwnerRole } from '../shared/helpers';
 export const prendasController = {
   async list(req: Request, res: Response) {
     try {
-      const prendas = await prendasService.list({
-        empresaId: asString(req.query.empresaId),
-        sucursalId: asString(req.query.sucursalId),
+      const user = req.user!;
+      // SIEMPRE filtrar por la empresa del usuario autenticado (del JWT)
+      const filters: any = {
+        empresaId: user.empresaId,
         estadoVenta: asString(req.query.estadoVenta),
         search: asString(req.query.search),
-      });
+      };
+
+      // Si NO es owner, filtrar por su sucursal
+      if (!isOwnerRole(user.rol) && user.sucursalId) {
+        filters.sucursalId = user.sucursalId;
+      }
+
+      const prendas = await prendasService.list(filters);
       res.json(prendas);
     } catch (error) {
       console.error('List prendas error:', error);
@@ -55,6 +63,12 @@ export const prendasController = {
       const id = asString(req.params.id);
       if (!id) return res.status(400).json({ message: 'ID requerido' });
 
+      // Verificar que la prenda pertenece a la empresa del usuario
+      const existing = await prendasService.findById(id);
+      if (!existing || existing.empresaId !== req.user!.empresaId) {
+        return res.status(404).json({ message: 'Prenda no encontrada' });
+      }
+
       const prenda = await prendasService.update(id, req.body);
       res.json(prenda);
     } catch (error) {
@@ -67,6 +81,12 @@ export const prendasController = {
     try {
       const id = asString(req.params.id);
       if (!id) return res.status(400).json({ message: 'ID requerido' });
+
+      // Verificar que la prenda pertenece a la empresa del usuario
+      const existing = await prendasService.findById(id);
+      if (!existing || existing.empresaId !== req.user!.empresaId) {
+        return res.status(404).json({ message: 'Prenda no encontrada' });
+      }
 
       await prendasService.remove(id);
       res.json({ message: 'Prenda eliminada' });

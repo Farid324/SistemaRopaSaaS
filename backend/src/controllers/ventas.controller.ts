@@ -2,18 +2,23 @@
 
 import { Request, Response } from 'express';
 import { ventasService } from '../services/ventas.service';
-import { asString } from '../shared/helpers';
+import { isOwnerRole } from '../shared/helpers';
 
 export const ventasController = {
   async list(req: Request, res: Response) {
     try {
       const user = req.user!;
+      // SIEMPRE filtrar por la empresa del usuario autenticado (del JWT)
       const filters: any = {
-        empresaId: asString(req.query.empresaId),
-        sucursalId: asString(req.query.sucursalId),
-        vendedorId: asString(req.query.vendedorId),
+        empresaId: user.empresaId,
       };
 
+      // Si NO es owner, filtrar por su sucursal
+      if (!isOwnerRole(user.rol) && user.sucursalId) {
+        filters.sucursalId = user.sucursalId;
+      }
+
+      // EMPLEADO solo ve sus propias ventas
       if (user.rol === 'EMPLEADO') filters.vendedorId = user.userId;
 
       const ventas = await ventasService.list(filters);
