@@ -1,7 +1,7 @@
 // app_movil/app/(tabs)/_layout.tsx  (REEMPLAZA el existente)
 
 import React from 'react';
-import { View, Text, StyleSheet, Platform, Image } from 'react-native';
+import { View, Text, StyleSheet, Platform, Image, TouchableOpacity } from 'react-native';
 import { Tabs, Redirect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -74,6 +74,11 @@ export default function TabsLayout() {
         ),
         headerRight: () => (
           <View style={st.headerRight}>
+            <TouchableOpacity style={st.notificationBtn}>
+              <Ionicons name="notifications-outline" size={20} color={colors.tx} />
+              {/* Indicador de notificación (opcional, se puede controlar con estado) */}
+              <View style={st.notificationBadge} />
+            </TouchableOpacity>
             {profilePhoto ? (
               <Image source={{ uri: profilePhoto }} style={st.avatarImg} />
             ) : (
@@ -132,7 +137,9 @@ const st = StyleSheet.create({
   headerLeft: { marginLeft: 16 },
   headerGreeting: { fontSize: 11 },
   headerRol: { fontSize: 13, fontWeight: '600' },
-  headerRight: { marginRight: 16 },
+  headerRight: { flexDirection: 'row', alignItems: 'center', marginRight: 16 },
+  notificationBtn: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', marginRight: 12, backgroundColor: 'rgba(0,0,0,0.03)' },
+  notificationBadge: { position: 'absolute', top: 8, right: 8, width: 8, height: 8, borderRadius: 4, backgroundColor: '#ef4444', borderWidth: 1, borderColor: '#fff' },
   avatar: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
   avatarImg: { width: 36, height: 36, borderRadius: 18 },
   avatarText: { color: '#fff', fontSize: 14, fontWeight: '600' },

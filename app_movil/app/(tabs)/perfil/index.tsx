@@ -30,6 +30,7 @@ export default function PerfilScreen() {
   const { currentUser, logout, profilePhoto, setProfilePhoto } = useAuth();
 
   const [showChangePass, setShowChangePass] = useState(false);
+  const [showPasswords, setShowPasswords] = useState(false);
   const [passForm, setPassForm] = useState({ actual: '', nueva: '', confirmar: '' });
   const [passError, setPassError] = useState('');
   const [passLoading, setPassLoading] = useState(false);
@@ -38,15 +39,15 @@ export default function PerfilScreen() {
   const badge = getRolBadge(currentUser.rol, colors);
 
   const pickPhoto = async () => {
-    const result = await ImagePicker.launchImageLibraryAsync({ allowsEditing: true, aspect: [1, 1], quality: 0.7 });
-    if (!result.canceled && result.assets[0]) setProfilePhoto(result.assets[0].uri);
+    const result = await ImagePicker.launchImageLibraryAsync({ allowsEditing: true, aspect: [1, 1], quality: 0.7, base64: true });
+    if (!result.canceled && result.assets[0]) setProfilePhoto(result.assets[0].uri, result.assets[0].base64);
   };
 
   const takePhoto = async () => {
     const perm = await ImagePicker.requestCameraPermissionsAsync();
     if (!perm.granted) return;
-    const result = await ImagePicker.launchCameraAsync({ allowsEditing: true, aspect: [1, 1], quality: 0.7 });
-    if (!result.canceled && result.assets[0]) setProfilePhoto(result.assets[0].uri);
+    const result = await ImagePicker.launchCameraAsync({ allowsEditing: true, aspect: [1, 1], quality: 0.7, base64: true });
+    if (!result.canceled && result.assets[0]) setProfilePhoto(result.assets[0].uri, result.assets[0].base64);
   };
 
   const showPhotoOptions = () => {
@@ -155,7 +156,24 @@ export default function PerfilScreen() {
             {passError !== '' && <View style={st.modalErr}><Text style={{ color: colors.acRed, fontSize: 13 }}>{passError}</Text></View>}
             {['Contraseña actual', 'Nueva contraseña', 'Confirmar nueva'].map((ph, i) => {
               const key = (['actual', 'nueva', 'confirmar'] as const)[i];
-              return <TextInput key={key} style={[st.modalInput, { backgroundColor: colors.fiSolid, borderColor: colors.bd2Solid, color: colors.tx }]} placeholder={ph} placeholderTextColor={colors.tx4} secureTextEntry value={passForm[key]} onChangeText={(t) => { setPassForm({ ...passForm, [key]: t }); setPassError(''); }} />;
+              return (
+                <View key={key} style={{ position: 'relative', justifyContent: 'center' }}>
+                  <TextInput 
+                    style={[st.modalInput, { backgroundColor: colors.fiSolid, borderColor: colors.bd2Solid, color: colors.tx, paddingRight: 40 }]} 
+                    placeholder={ph} 
+                    placeholderTextColor={colors.tx4} 
+                    secureTextEntry={!showPasswords} 
+                    value={passForm[key]} 
+                    onChangeText={(t) => { setPassForm({ ...passForm, [key]: t }); setPassError(''); }} 
+                  />
+                  <TouchableOpacity 
+                    style={{ position: 'absolute', right: 12 }} 
+                    onPress={() => setShowPasswords(!showPasswords)}
+                  >
+                    <Ionicons name={showPasswords ? "eye-off-outline" : "eye-outline"} size={20} color={colors.tx4} />
+                  </TouchableOpacity>
+                </View>
+              );
             })}
             <View style={st.modalBtns}>
               <TouchableOpacity onPress={() => { setShowChangePass(false); setPassError(''); }} style={[st.modalCancel, { backgroundColor: colors.fiSolid, borderColor: colors.bd }]}>

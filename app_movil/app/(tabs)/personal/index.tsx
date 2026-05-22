@@ -3,7 +3,7 @@
 import React, { useState, useCallback } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  Modal, ActivityIndicator, RefreshControl, Alert,
+  Modal, ActivityIndicator, RefreshControl, Alert, Image,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -165,9 +165,13 @@ export default function PersonalScreen() {
             <View key={u.id} style={[st.userCard, { backgroundColor: colors.cdSolid, borderColor: colors.bd2Solid, ...colors.cardShadow }]}>
               <View style={st.userCardInner}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 }}>
-                  <LinearGradient colors={getRolGradient(u.rol)} style={st.userAvatar}>
-                    <Text style={{ color: '#fff', fontSize: 14, fontWeight: '600' }}>{u.nombreCompleto.charAt(0)}</Text>
-                  </LinearGradient>
+                  {u.fotoPerfil ? (
+                    <Image source={{ uri: u.fotoPerfil }} style={st.userAvatarImg} />
+                  ) : (
+                    <LinearGradient colors={getRolGradient(u.rol)} style={st.userAvatar}>
+                      <Text style={{ color: '#fff', fontSize: 14, fontWeight: '600' }}>{u.nombreCompleto.charAt(0)}</Text>
+                    </LinearGradient>
+                  )}
                   <View style={{ flex: 1 }}>
                     <Text style={{ color: colors.tx, fontSize: 14, fontWeight: '500' }}>{u.nombreCompleto}</Text>
                     <Text style={{ color: colors.tx4, fontSize: 11 }}>{u.correo}</Text>
@@ -266,6 +270,7 @@ const st = StyleSheet.create({
   userCard: { borderRadius: 18, borderWidth: 1, padding: 16 },
   userCardInner: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' },
   userAvatar: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
+  userAvatarImg: { width: 40, height: 40, borderRadius: 20 },
   pill: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 20, borderWidth: 1 },
   iconBtn: { width: 32, height: 32, borderRadius: 8, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
 });

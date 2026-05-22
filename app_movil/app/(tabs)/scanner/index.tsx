@@ -1,9 +1,9 @@
 //app_movil/app/(tabs)/scanner/index.tsx
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, Image,
-  Modal, ActivityIndicator,
+  Modal, ActivityIndicator, Animated, LayoutChangeEvent,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -19,6 +19,36 @@ import api from '../../../src/services/api';
 
 import { Prenda, TipoCodigo, MetodoPago, PaymentMethod } from '../../../src/types/scanner/types';
 
+// ── Toast flotante sobre la cámara ──
+type ToastType = 'success' | 'error' | 'warning';
+interface ToastData { type: ToastType; msg: string; code?: string }
+
+function ScanToast({ toast, colors }: { toast: ToastData; colors: any }) {
+  const opacity = useRef(new Animated.Value(0)).current;
+  const translateY = useRef(new Animated.Value(-20)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(opacity, { toValue: 1, duration: 250, useNativeDriver: true }),
+      Animated.timing(translateY, { toValue: 0, duration: 250, useNativeDriver: true }),
+    ]).start();
+  }, []);
+
+  const bgColor = toast.type === 'success' ? 'rgba(52,211,153,0.95)'
+    : toast.type === 'error' ? 'rgba(248,113,113,0.95)'
+    : 'rgba(251,191,36,0.95)';
+  const icon: keyof typeof Ionicons.glyphMap = toast.type === 'success' ? 'checkmark-circle'
+    : toast.type === 'error' ? 'close-circle'
+    : 'warning';
+
+  return (
+    <Animated.View style={[st.toast, { backgroundColor: bgColor, opacity, transform: [{ translateY }] }]}>
+      <Ionicons name={icon} size={18} color="#fff" />
+      <Text style={st.toastText} numberOfLines={1}>{toast.msg}</Text>
+    </Animated.View>
+  );
+}
+
 export default function ScannerScreen() {
   const { colors } = useTheme();
   const { currentUser } = useAuth();
@@ -26,12 +56,8 @@ export default function ScannerScreen() {
 
   const [activeTab, setActiveTab] = useState<TipoCodigo>('BARRAS');
   const [manualSearch, setManualSearch] = useState('');
-  const [scanned, setScanned] = useState(false);
   const [searching, setSearching] = useState(false);
   const [cart, setCart] = useState<Prenda[]>([]);
-  const [lastFound, setLastFound] = useState<Prenda | null>(null);
-  const [notFound, setNotFound] = useState(false);
-  const [scannedCode, setScannedCode] = useState('');
   const [ventaExitosa, setVentaExitosa] = useState(false);
   const [ventaId, setVentaId] = useState('');
   const [showCart, setShowCart] = useState(false);
@@ -39,73 +65,203 @@ export default function ScannerScreen() {
   const [processing, setProcessing] = useState(false);
   const [confirmModal, setConfirmModal] = useState<ConfirmModalState>(INITIAL_CONFIRM_STATE);
 
+  // ── Batch scanning ──
+  const [batchMode, setBatchMode] = useState(false);
+  const [batchItems, setBatchItems] = useState<Prenda[]>([]);
+  const [toast, setToast] = useState<ToastData | null>(null);
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const cooldownRef = useRef(false);
+  const lastScannedCode = useRef('');
+
+  // ── Overlay filtering ──
+  const cameraLayout = useRef({ width: 0, height: 0 });
+
   // Clave: forzar remount de la cámara al volver al tab
   const [cameraKey, setCameraKey] = useState(0);
 
   useFocusEffect(
     useCallback(() => {
-      // Al entrar al tab: resetear scan y forzar remount de cámara
-      setScanned(false);
       setCameraKey((k) => k + 1);
-
       return () => {
-        // Al salir del tab: limpiar estado de escaneo
-        setScanned(false);
+        cooldownRef.current = false;
       };
     }, [])
   );
 
   if (!currentUser) return null;
 
-  const resetSearch = () => {
-    setLastFound(null);
-    setNotFound(false);
-    setScannedCode('');
-    setManualSearch('');
-    setScanned(false);
-    setSearching(false);
+  // ── Helpers ──
+  const showToast = (data: ToastData) => {
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    setToast(data);
+    toastTimer.current = setTimeout(() => setToast(null), 2200);
   };
 
   const resetAll = () => {
-    resetSearch();
+    setBatchMode(false);
+    setBatchItems([]);
     setCart([]);
+    setManualSearch('');
     setVentaExitosa(false);
     setVentaId('');
     setShowCart(false);
+    setToast(null);
+    cooldownRef.current = false;
+    lastScannedCode.current = '';
+  };
+
+  const startBatchMode = () => {
+    setBatchMode(true);
+    setShowCart(false);
+    setCameraKey((k) => k + 1);
+  };
+
+  const finishBatchMode = () => {
+    setBatchMode(false);
+    if (batchItems.length > 0) {
+      // Merge batch items into cart (avoid duplicates)
+      setCart((prev) => {
+        const ids = new Set(prev.map((p) => p.id));
+        const newItems = batchItems.filter((p) => !ids.has(p.id));
+        return [...prev, ...newItems];
+      });
+      setShowCart(true);
+    }
+  };
+
+  // ── Check if barcode is inside overlay area ──
+  const isBarcodeInsideOverlay = (bounds: any, cornerPoints: any): boolean => {
+    // Si no tenemos ni bounds ni cornerPoints, es mejor permitir el escaneo por si el dispositivo no lo soporta
+    if (!bounds?.origin && (!cornerPoints || cornerPoints.length === 0)) return true; 
+
+    const cam = cameraLayout.current;
+    if (cam.width === 0 || cam.height === 0) return true;
+
+    const isBarras = activeTab === 'BARRAS';
+    // Dimensiones reales del overlay visual
+    const overlayW = isBarras ? 280 : 200;
+    const overlayH = isBarras ? 100 : 200;
+
+    const overlayLeft = (cam.width - overlayW) / 2;
+    const overlayTop = (cam.height - overlayH) / 2;
+    const overlayRight = overlayLeft + overlayW;
+    const overlayBottom = overlayTop + overlayH;
+
+    let bcCenterX = 0;
+    let bcCenterY = 0;
+
+    if (bounds?.origin && bounds?.size) {
+      bcCenterX = bounds.origin.x + (bounds.size.width / 2);
+      bcCenterY = bounds.origin.y + (bounds.size.height / 2);
+    } else if (cornerPoints && cornerPoints.length > 0) {
+      // Calcular centro usando los cornerPoints
+      bcCenterX = cornerPoints.reduce((acc: number, pt: any) => acc + pt.x, 0) / cornerPoints.length;
+      bcCenterY = cornerPoints.reduce((acc: number, pt: any) => acc + pt.y, 0) / cornerPoints.length;
+    }
+
+    // Tolerancia muy estricta (solo 5% de margen extra) para forzar al usuario a ponerlo en el cuadro
+    const toleranceX = overlayW * 0.05;
+    const toleranceY = overlayH * 0.05;
+
+    return (
+      bcCenterX >= (overlayLeft - toleranceX) &&
+      bcCenterX <= (overlayRight + toleranceX) &&
+      bcCenterY >= (overlayTop - toleranceY) &&
+      bcCenterY <= (overlayBottom + toleranceY)
+    );
+  };
+
+  const onCameraLayout = (e: LayoutChangeEvent) => {
+    const { width, height } = e.nativeEvent.layout;
+    cameraLayout.current = { width, height };
   };
 
   // ── Buscar prenda en backend ──
-  const searchByCode = async (code: string) => {
-    if (!code.trim()) return;
-    setScannedCode(code);
-    setSearching(true);
+  const searchByCode = async (code: string): Promise<{ found: boolean; prenda?: Prenda; error?: string }> => {
     try {
       const res = await api.get(`/prendas/codigo/${encodeURIComponent(code)}`);
-      setLastFound(res.data);
-      setNotFound(false);
+      return { found: true, prenda: res.data };
     } catch {
-      setLastFound(null);
-      setNotFound(true);
+      return { found: false, error: 'No encontrada' };
     }
+  };
+
+  // ── Batch scan handler ──
+  const handleBarCodeScanned = async ({ data, bounds, cornerPoints }: { type: string; data: string; bounds?: any, cornerPoints?: any }) => {
+    // Skip if in cooldown or searching
+    if (cooldownRef.current || searching) return;
+
+    // Skip if same code as last scan (rapid fire prevention)
+    if (data === lastScannedCode.current) return;
+
+    // Check if barcode is inside overlay area
+    if (!isBarcodeInsideOverlay(bounds, cornerPoints)) return;
+
+    // Start cooldown
+    cooldownRef.current = true;
+    lastScannedCode.current = data;
+
+    setSearching(true);
+    const result = await searchByCode(data);
     setSearching(false);
+
+    if (result.found && result.prenda) {
+      const prenda = result.prenda;
+
+      // Check if already in batch or cart
+      const alreadyInBatch = batchItems.some((p) => p.id === prenda.id);
+      const alreadyInCart = cart.some((p) => p.id === prenda.id);
+
+      if (alreadyInBatch || alreadyInCart) {
+        showToast({ type: 'warning', msg: 'Ya escaneada', code: data });
+      } else if (prenda.estadoVenta !== 'DISPONIBLE') {
+        showToast({ type: 'error', msg: 'Prenda ya vendida', code: data });
+      } else {
+        setBatchItems((prev) => [...prev, prenda]);
+        showToast({ type: 'success', msg: `${prenda.marca ? prenda.marca + ' - ' : ''}${prenda.tipo}`, code: data });
+      }
+    } else {
+      showToast({ type: 'error', msg: 'Prenda no encontrada', code: data });
+    }
+
+    // Release cooldown after 1.5s
+    setTimeout(() => {
+      cooldownRef.current = false;
+      lastScannedCode.current = '';
+    }, 1500);
   };
 
-  const handleBarCodeScanned = async ({ data }: { type: string; data: string }) => {
-    if (scanned || searching) return;
-    setScanned(true);
-    await searchByCode(data);
+  // ── Manual search in batch mode ──
+  const handleManualSearch = async () => {
+    if (!manualSearch.trim()) return;
+    setSearching(true);
+    const result = await searchByCode(manualSearch.trim());
+    setSearching(false);
+
+    if (result.found && result.prenda) {
+      const prenda = result.prenda;
+      const alreadyInBatch = batchItems.some((p) => p.id === prenda.id);
+      const alreadyInCart = cart.some((p) => p.id === prenda.id);
+
+      if (alreadyInBatch || alreadyInCart) {
+        showToast({ type: 'warning', msg: 'Ya escaneada' });
+      } else if (prenda.estadoVenta !== 'DISPONIBLE') {
+        showToast({ type: 'error', msg: 'Prenda ya vendida' });
+      } else {
+        setBatchItems((prev) => [...prev, prenda]);
+        showToast({ type: 'success', msg: `${prenda.marca ? prenda.marca + ' - ' : ''}${prenda.tipo}` });
+      }
+    } else {
+      showToast({ type: 'error', msg: 'Prenda no encontrada' });
+    }
+    setManualSearch('');
   };
 
-  const addToCart = (p: Prenda) => {
-    if (cart.find((c) => c.id === p.id)) return;
-    setCart((prev) => [...prev, p]);
-    resetSearch();
-  };
-
+  const removeBatchItem = (id: string) => setBatchItems((prev) => prev.filter((p) => p.id !== id));
   const removeFromCart = (id: string) => setCart((prev) => prev.filter((c) => c.id !== id));
-  const total = cart.reduce((s, p) => s + (p.rebaja || p.precio), 0);
-  const alreadyInCart = lastFound ? cart.some((c) => c.id === lastFound.id) : false;
-  const showScanArea = !lastFound && !notFound && !searching;
+  const batchTotal = batchItems.reduce((s, p) => s + (p.rebaja || p.precio), 0);
+  const cartTotal = cart.reduce((s, p) => s + (p.rebaja || p.precio), 0);
+  const displayTotal = showCart ? cartTotal : batchTotal;
 
   // ── Confirmar venta ──
   const handleConfirmSale = async (metodosPago: PaymentMethod[]) => {
@@ -119,6 +275,7 @@ export default function ScannerScreen() {
       });
       setVentaId(res.data.id?.slice(0, 8)?.toUpperCase() || '');
       setCart([]);
+      setBatchItems([]);
       setVentaExitosa(true);
       setShowCart(false);
     } catch (error: any) {
@@ -145,6 +302,8 @@ export default function ScannerScreen() {
     { id: 'MANUAL', icon: 'keypad-outline', label: 'Manual' },
   ];
 
+  // ══════════════════════════════ RENDER ══════════════════════════════
+
   return (
     <ScrollView style={[st.container, { backgroundColor: colors.pg }]} contentContainerStyle={st.content} showsVerticalScrollIndicator={false}>
       {/* Header */}
@@ -154,10 +313,10 @@ export default function ScannerScreen() {
           <Text style={{ color: colors.tx4, fontSize: 12, marginTop: 2 }}>Escanea prendas para vender</Text>
         </View>
         {cart.length > 0 && (
-          <TouchableOpacity onPress={() => setShowCart(true)} activeOpacity={0.85}>
+          <TouchableOpacity onPress={() => { setBatchMode(false); setShowCart(true); }} activeOpacity={0.85}>
             <LinearGradient colors={['#fb7185', '#f59e0b']} style={st.cartBtn}>
               <Ionicons name="cart-outline" size={18} color="#fff" />
-              <Text style={{ color: '#fff', fontSize: 13, fontWeight: '600' }}>Bs {total}</Text>
+              <Text style={{ color: '#fff', fontSize: 13, fontWeight: '600' }}>Bs {cartTotal}</Text>
               <View style={st.cartCount}><Text style={{ color: '#fb7185', fontSize: 10, fontWeight: '700' }}>{cart.length}</Text></View>
             </LinearGradient>
           </TouchableOpacity>
@@ -175,21 +334,20 @@ export default function ScannerScreen() {
         </View>
       )}
 
-      {/* Buscando... */}
-      {searching && (
-        <View style={[st.scanCard, { backgroundColor: colors.cdSolid, borderColor: colors.bd2Solid, padding: 40, alignItems: 'center' }]}>
-          <ActivityIndicator size="large" color={colors.acRose} />
-          <Text style={{ color: colors.tx3, fontSize: 13, marginTop: 12 }}>Buscando prenda...</Text>
-        </View>
-      )}
-
-      {/* Scanner card */}
-      {!ventaExitosa && !searching && (
+      {/* ══════════ SCANNER CARD ══════════ */}
+      {!ventaExitosa && (
         <View style={[st.scanCard, { backgroundColor: colors.cdSolid, borderColor: colors.bd2Solid, ...colors.cardShadow }]}>
           {/* Tabs */}
           <View style={[st.tabsRow, { borderBottomColor: colors.bd }]}>
             {tabs.map((tab) => (
-              <TouchableOpacity key={tab.id} onPress={() => { setActiveTab(tab.id); resetSearch(); }}
+              <TouchableOpacity key={tab.id} onPress={() => {
+                setActiveTab(tab.id);
+                setBatchMode(false);
+                setBatchItems([]);
+                setToast(null);
+                cooldownRef.current = false;
+                lastScannedCode.current = '';
+              }}
                 style={[st.tab, activeTab === tab.id && { borderBottomWidth: 2, borderBottomColor: colors.acRose, backgroundColor: 'rgba(251,113,133,0.05)' }]}>
                 <Ionicons name={tab.icon} size={20} color={activeTab === tab.id ? colors.acRose : colors.tx4} />
                 <Text style={{ color: activeTab === tab.id ? colors.acRose : colors.tx4, fontSize: 11 }}>{tab.label}</Text>
@@ -198,8 +356,8 @@ export default function ScannerScreen() {
           </View>
 
           <View style={{ padding: 16, gap: 14 }}>
-            {/* Camera real */}
-            {activeTab !== 'MANUAL' && showScanArea && (
+            {/* ── START BUTTON (initial state, not batch yet) ── */}
+            {activeTab !== 'MANUAL' && !batchMode && (
               <>
                 {!permission?.granted ? (
                   <View style={[st.cameraBox, { borderColor: colors.bd }]}>
@@ -210,109 +368,138 @@ export default function ScannerScreen() {
                     </View>
                   </View>
                 ) : (
-                  <View style={[st.cameraBox, { borderColor: colors.acRose, overflow: 'hidden' }]}>
-                    <CameraView
-                      key={`cam-${cameraKey}-${activeTab}`}
-                      style={StyleSheet.absoluteFillObject}
-                      facing="back"
-                      barcodeScannerSettings={{ barcodeTypes }}
-                      onBarcodeScanned={scanned ? undefined : handleBarCodeScanned}
-                    />
-                    {/* Overlay adaptativo */}
-                    <View style={st.scanOverlay}>
+                  <TouchableOpacity onPress={startBatchMode} activeOpacity={0.85}>
+                    <LinearGradient colors={['#fb7185', '#e11d48']} style={st.startScanBtn}>
+                      <View style={st.startScanIcon}>
+                        <Ionicons name={isBarras ? 'barcode-outline' : 'qr-code-outline'} size={32} color="#fff" />
+                      </View>
+                      <Text style={st.startScanTitle}>Iniciar Escaneo</Text>
+                      <Text style={st.startScanSub}>
+                        {isBarras ? 'Escanea códigos de barras' : 'Escanea códigos QR'}
+                      </Text>
+                    </LinearGradient>
+                  </TouchableOpacity>
+                )}
+              </>
+            )}
+
+            {/* ── CAMERA (batch mode active) ── */}
+            {activeTab !== 'MANUAL' && batchMode && permission?.granted && (
+              <>
+                <View style={[st.cameraBox, { borderColor: colors.acRose, overflow: 'hidden' }]} onLayout={onCameraLayout}>
+                  <CameraView
+                    key={`cam-${cameraKey}-${activeTab}`}
+                    style={StyleSheet.absoluteFillObject}
+                    facing="back"
+                    barcodeScannerSettings={{ barcodeTypes }}
+                    onBarcodeScanned={handleBarCodeScanned}
+                  />
+                  {/* Overlay adaptativo */}
+                  <View style={st.scanOverlay}>
+                    {/* Dark areas around overlay */}
+                    <View style={st.overlayDarkTop} />
+                    <View style={st.overlayMiddleRow}>
+                      <View style={st.overlayDarkSide} />
                       <View style={[st.scanGuide, isBarras ? st.guideBarras : st.guideQR]}>
                         <View style={[st.corner, st.cTL]} />
                         <View style={[st.corner, st.cTR]} />
                         <View style={[st.corner, st.cBL]} />
                         <View style={[st.corner, st.cBR]} />
                       </View>
+                      <View style={st.overlayDarkSide} />
+                    </View>
+                    <View style={st.overlayDarkBottom}>
                       <Text style={st.scanHint}>
-                        {isBarras ? 'Apunta al código de barras' : 'Apunta al código QR'}
+                        {isBarras ? 'Coloca el código de barras en el recuadro' : 'Coloca el código QR en el recuadro'}
                       </Text>
                     </View>
-                    {cart.length > 0 && (
-                      <View style={st.cartBadgeOverlay}>
-                        <Text style={{ color: '#fff', fontSize: 10 }}>{cart.length} en carrito</Text>
-                      </View>
-                    )}
                   </View>
-                )}
+
+                  {/* Searching indicator */}
+                  {searching && (
+                    <View style={st.searchingOverlay}>
+                      <ActivityIndicator size="small" color="#fff" />
+                    </View>
+                  )}
+
+                  {/* Toast flotante */}
+                  {toast && <ScanToast toast={toast} colors={colors} />}
+
+                  {/* Badge de items */}
+                  {(batchItems.length > 0 || cart.length > 0) && (
+                    <View style={st.cartBadgeOverlay}>
+                      <Text style={{ color: '#fff', fontSize: 10, fontWeight: '600' }}>
+                        {batchItems.length + cart.length} prenda{batchItems.length + cart.length > 1 ? 's' : ''}
+                      </Text>
+                    </View>
+                  )}
+                </View>
+
+                {/* Botón para cerrar cámara */}
+                <TouchableOpacity onPress={() => setBatchMode(false)} style={[st.closeCamBtn, { borderColor: 'rgba(248,113,113,0.2)' }]}>
+                  <Ionicons name="close-circle-outline" size={16} color={colors.acRed} />
+                  <Text style={{ color: colors.acRed, fontSize: 12 }}>Cerrar cámara</Text>
+                </TouchableOpacity>
               </>
             )}
 
-            {/* Manual */}
-            {activeTab === 'MANUAL' && showScanArea && (
+            {/* ── MANUAL MODE ── */}
+            {activeTab === 'MANUAL' && (
               <>
-                <Input icon="keypad-outline" placeholder="Código de la prenda..." value={manualSearch} onChangeText={setManualSearch} onSubmitEditing={() => searchByCode(manualSearch)} />
-                {cart.length > 0 && <Text style={{ color: colors.acRose, fontSize: 11 }}>{cart.length} prenda{cart.length > 1 ? 's' : ''} en carrito</Text>}
-                <Button variant="gradient" onPress={() => searchByCode(manualSearch)} disabled={!manualSearch.trim()}>Buscar Prenda</Button>
+                <Input icon="keypad-outline" placeholder="Código de la prenda..." value={manualSearch} onChangeText={setManualSearch} onSubmitEditing={handleManualSearch} />
+                <Button variant="gradient" onPress={handleManualSearch} disabled={!manualSearch.trim() || searching}>
+                  {searching ? 'Buscando...' : 'Buscar Prenda'}
+                </Button>
               </>
             )}
 
-            {/* Prenda encontrada */}
-            {lastFound && (
-              <View style={{ gap: 12 }}>
-                <View style={[st.foundBanner, { backgroundColor: 'rgba(52,211,153,0.08)', borderColor: 'rgba(52,211,153,0.2)' }]}>
-                  <Ionicons name="checkmark-circle" size={18} color={colors.acEmerald} />
-                  <Text style={{ color: colors.acEmerald, fontSize: 13, flex: 1 }}>Prenda encontrada</Text>
-                  <Text style={{ color: colors.tx4, fontSize: 10 }}>{scannedCode}</Text>
-                </View>
-                <View style={st.foundRow}>
-                  <View style={[st.foundImg, { backgroundColor: colors.fiSolid, borderColor: colors.bd }]}>
-                    {lastFound.foto ? <Image source={{ uri: lastFound.foto }} style={{ width: '100%', height: '100%' }} /> : <Ionicons name="pricetag-outline" size={28} color={colors.tx4} />}
+            {/* ── BATCH ITEMS LIST (scanned items) ── */}
+            {batchItems.length > 0 && (
+              <View style={{ gap: 8 }}>
+                <View style={st.batchHeader}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <Ionicons name="list" size={16} color={colors.acRose} />
+                    <Text style={{ color: colors.tx, fontSize: 14, fontWeight: '500' }}>
+                      Prendas escaneadas ({batchItems.length})
+                    </Text>
                   </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={{ color: colors.tx, fontSize: 15, fontWeight: '500' }}>{lastFound.marca ? `${lastFound.marca} - ` : ''}{lastFound.tipo}</Text>
-                    {lastFound.detalles && <Text style={{ color: colors.tx3, fontSize: 12, marginTop: 2 }} numberOfLines={1}>{lastFound.detalles}</Text>}
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 6 }}>
-                      {lastFound.rebaja ? (<><Text style={{ color: colors.tx4, textDecorationLine: 'line-through', fontSize: 12 }}>Bs {lastFound.precio}</Text><Text style={{ color: colors.acAmber, fontSize: 16, fontWeight: '600' }}>Bs {lastFound.rebaja}</Text></>) : (<Text style={{ color: colors.acRose, fontSize: 16, fontWeight: '600' }}>Bs {lastFound.precio}</Text>)}
-                    </View>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4 }}>
-                      <View style={[st.miniPill, { backgroundColor: lastFound.estadoVenta === 'DISPONIBLE' ? 'rgba(52,211,153,0.15)' : 'rgba(248,113,113,0.15)' }]}>
-                        <Text style={{ color: lastFound.estadoVenta === 'DISPONIBLE' ? colors.acEmerald : colors.acRed, fontSize: 9 }}>{lastFound.estadoVenta === 'DISPONIBLE' ? 'Disponible' : 'Vendido'}</Text>
-                      </View>
-                      {lastFound.sucursal && <Text style={{ color: colors.tx4, fontSize: 10 }}>{lastFound.sucursal.nombre}</Text>}
-                    </View>
-                  </View>
+                  <Text style={{ color: colors.acAmber, fontSize: 13, fontWeight: '600' }}>Bs {batchTotal}</Text>
                 </View>
 
-                {lastFound.estadoVenta === 'DISPONIBLE' && !alreadyInCart && (
-                  <TouchableOpacity onPress={() => addToCart(lastFound)} activeOpacity={0.85}>
-                    <LinearGradient colors={['#34d399', '#059669']} style={st.addCartBtn}>
-                      <Ionicons name="add" size={20} color="#fff" />
-                      <Text style={{ color: '#fff', fontSize: 14, fontWeight: '600' }}>Añadir · Bs {lastFound.rebaja || lastFound.precio}</Text>
-                    </LinearGradient>
-                  </TouchableOpacity>
-                )}
-                {alreadyInCart && (
-                  <View style={[st.infoBanner, { backgroundColor: 'rgba(251,191,36,0.08)', borderColor: 'rgba(251,191,36,0.2)' }]}>
-                    <Text style={{ color: colors.acAmber, fontSize: 13, textAlign: 'center' }}>Ya está en el carrito</Text>
+                {batchItems.map((p, idx) => (
+                  <View key={p.id} style={[st.batchItem, { backgroundColor: colors.fiSolid, borderColor: colors.bd }]}>
+                    <Text style={{ color: colors.tx4, fontSize: 10, width: 20 }}>{idx + 1}.</Text>
+                    <View style={[st.batchItemImg, { backgroundColor: colors.pg, borderColor: colors.bd }]}>
+                      {p.foto ? <Image source={{ uri: p.foto }} style={{ width: '100%', height: '100%' }} resizeMode="cover" /> : <Ionicons name="pricetag-outline" size={14} color={colors.tx4} />}
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ color: colors.tx, fontSize: 12 }} numberOfLines={1}>{p.marca ? `${p.marca} - ` : ''}{p.tipo}</Text>
+                      <Text style={{ color: colors.tx4, fontSize: 10 }}>{p.codigo}</Text>
+                    </View>
+                    <Text style={{ color: colors.acAmber, fontSize: 12, fontWeight: '600' }}>Bs {p.rebaja || p.precio}</Text>
+                    <TouchableOpacity onPress={() => removeBatchItem(p.id)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                      <Ionicons name="trash-outline" size={14} color={colors.acRed} />
+                    </TouchableOpacity>
                   </View>
-                )}
-                {lastFound.estadoVenta !== 'DISPONIBLE' && (
-                  <View style={[st.infoBanner, { backgroundColor: 'rgba(248,113,113,0.08)', borderColor: 'rgba(248,113,113,0.2)' }]}>
-                    <Text style={{ color: colors.acRed, fontSize: 13, textAlign: 'center' }}>Esta prenda ya fue vendida</Text>
-                  </View>
-                )}
-                <Button variant="outline" onPress={resetSearch}>Escanear otra</Button>
-              </View>
-            )}
+                ))}
 
-            {/* No encontrada */}
-            {notFound && (
-              <View style={{ alignItems: 'center', paddingVertical: 16, gap: 8 }}>
-                <View style={[st.notFoundIcon, { backgroundColor: 'rgba(251,191,36,0.1)' }]}><Ionicons name="search" size={32} color={colors.acAmber} style={{ opacity: 0.6 }} /></View>
-                <Text style={{ color: colors.acAmber, fontSize: 14 }}>No se encontró prenda</Text>
-                <Text style={{ color: colors.tx4, fontSize: 12 }}>Código: {scannedCode}</Text>
-                <Button variant="secondary" onPress={resetSearch}>Reintentar</Button>
+                {/* Finalizar escaneo */}
+                <TouchableOpacity onPress={finishBatchMode} activeOpacity={0.85}>
+                  <LinearGradient colors={['#34d399', '#059669']} style={st.finishBtn}>
+                    <Ionicons name="cart" size={20} color="#fff" />
+                    <Text style={{ color: '#fff', fontSize: 15, fontWeight: '600' }}>
+                      Finalizar escaneo · Bs {batchTotal}
+                    </Text>
+                  </LinearGradient>
+                </TouchableOpacity>
               </View>
             )}
           </View>
         </View>
       )}
 
-      {/* Carrito inline */}
-      {!ventaExitosa && cart.length > 0 && !showCart && (
+      {/* ══════════ CART INLINE (when not in batch mode and cart has items) ══════════ */}
+      {!ventaExitosa && cart.length > 0 && !showCart && !batchMode && (
         <View style={[st.cartPreview, { backgroundColor: colors.cdSolid, borderColor: colors.bd2Solid, ...colors.cardShadow }]}>
           <View style={st.cartPreviewHeader}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
@@ -333,20 +520,27 @@ export default function ScannerScreen() {
           ))}
           <View style={[st.cartTotalRow, { borderTopColor: colors.bd }]}>
             <Text style={{ color: colors.tx3, fontSize: 13 }}>Total</Text>
-            <Text style={{ color: colors.acRose, fontSize: 18, fontWeight: '600' }}>Bs {total}</Text>
+            <Text style={{ color: colors.acRose, fontSize: 18, fontWeight: '600' }}>Bs {cartTotal}</Text>
           </View>
+
+          {/* Escanear más */}
+          <TouchableOpacity onPress={startBatchMode} style={[st.addMoreBtn, { borderColor: 'rgba(251,113,133,0.2)' }]}>
+            <Ionicons name="scan-outline" size={16} color={colors.acRose} />
+            <Text style={{ color: colors.acRose, fontSize: 13 }}>Escanear más prendas</Text>
+          </TouchableOpacity>
+
           <TouchableOpacity onPress={() => setShowPayment(true)} activeOpacity={0.85}>
             <LinearGradient colors={['#34d399', '#059669']} style={st.confirmBtn}>
               {processing ? <ActivityIndicator color="#fff" /> : (<>
                 <Ionicons name="cart" size={20} color="#fff" />
-                <Text style={{ color: '#fff', fontSize: 15, fontWeight: '600' }}>Vender {cart.length} prenda{cart.length > 1 ? 's' : ''} · Bs {total}</Text>
+                <Text style={{ color: '#fff', fontSize: 15, fontWeight: '600' }}>Vender {cart.length} prenda{cart.length > 1 ? 's' : ''} · Bs {cartTotal}</Text>
               </>)}
             </LinearGradient>
           </TouchableOpacity>
         </View>
       )}
 
-      {/* Cart Modal */}
+      {/* ══════════ CART MODAL ══════════ */}
       <Modal visible={showCart} transparent animationType="slide">
         <View style={[st.modalOv, { backgroundColor: colors.ov }]}>
           <View style={[st.modalSheet, { backgroundColor: colors.cdSolid, borderColor: colors.bd2Solid }]}>
@@ -376,14 +570,14 @@ export default function ScannerScreen() {
                   </TouchableOpacity>
                 </View>
               ))}
-              <TouchableOpacity onPress={() => setShowCart(false)} style={[st.addMoreBtn, { borderColor: 'rgba(251,113,133,0.2)' }]}>
-                <Ionicons name="add" size={16} color={colors.acRose} />
+              <TouchableOpacity onPress={() => { setShowCart(false); startBatchMode(); }} style={[st.addMoreBtn, { borderColor: 'rgba(251,113,133,0.2)' }]}>
+                <Ionicons name="scan-outline" size={16} color={colors.acRose} />
                 <Text style={{ color: colors.acRose, fontSize: 13 }}>Escanear más prendas</Text>
               </TouchableOpacity>
               <View style={[st.totalCard, { borderColor: 'rgba(251,113,133,0.15)' }]}>
-                <View style={st.totalRow}><Text style={{ color: colors.tx3, fontSize: 13 }}>Prendas ({cart.length})</Text><Text style={{ color: colors.tx }}>Bs {total}</Text></View>
+                <View style={st.totalRow}><Text style={{ color: colors.tx3, fontSize: 13 }}>Prendas ({cart.length})</Text><Text style={{ color: colors.tx }}>Bs {cartTotal}</Text></View>
                 <View style={[st.totalDivider, { borderTopColor: 'rgba(251,113,133,0.15)' }]} />
-                <View style={st.totalRow}><Text style={{ color: colors.acRose, fontSize: 15 }}>Total a cobrar</Text><Text style={{ color: colors.acRose, fontSize: 20, fontWeight: '600' }}>Bs {total}</Text></View>
+                <View style={st.totalRow}><Text style={{ color: colors.acRose, fontSize: 15 }}>Total a cobrar</Text><Text style={{ color: colors.acRose, fontSize: 20, fontWeight: '600' }}>Bs {cartTotal}</Text></View>
               </View>
               <TouchableOpacity onPress={() => { setShowCart(false); setShowPayment(true); }} activeOpacity={0.85}>
                 <LinearGradient colors={['#34d399', '#059669']} style={st.confirmBtnLg}>
@@ -396,7 +590,7 @@ export default function ScannerScreen() {
         </View>
       </Modal>
 
-      <PaymentModal visible={showPayment} total={total} itemCount={cart.length}
+      <PaymentModal visible={showPayment} total={cartTotal} itemCount={cart.length}
         onConfirm={handleConfirmSale} onCancel={() => setShowPayment(false)} />
       <ConfirmModal {...confirmModal} onCancel={() => setConfirmModal(INITIAL_CONFIRM_STATE)} />
     </ScrollView>
@@ -415,30 +609,58 @@ const st = StyleSheet.create({
   tabsRow: { flexDirection: 'row', borderBottomWidth: 1 },
   tab: { flex: 1, alignItems: 'center', gap: 4, paddingVertical: 12 },
   cameraBox: { aspectRatio: 3 / 4, borderRadius: 18, borderWidth: 2, backgroundColor: '#000', alignItems: 'center', justifyContent: 'center' },
-  // Overlay adaptativo
-  scanOverlay: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center' },
+
+  // ── Start scan button ──
+  startScanBtn: { borderRadius: 18, padding: 32, alignItems: 'center', gap: 12 },
+  startScanIcon: { width: 72, height: 72, borderRadius: 36, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center' },
+  startScanTitle: { color: '#fff', fontSize: 18, fontWeight: '700' },
+  startScanSub: { color: 'rgba(255,255,255,0.7)', fontSize: 13 },
+
+  // ── Overlay (dark areas around the scan guide) ──
+  scanOverlay: { ...StyleSheet.absoluteFillObject, justifyContent: 'center' },
+  overlayDarkTop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)' },
+  overlayMiddleRow: { flexDirection: 'row', alignItems: 'center' },
+  overlayDarkSide: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)' },
+  overlayDarkBottom: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', alignItems: 'center', paddingTop: 16 },
   scanGuide: { position: 'relative' },
-  guideBarras: { width: 280, height: 100 },   // rectángulo horizontal
-  guideQR: { width: 200, height: 200 },        // cuadrado
+  guideBarras: { width: 280, height: 100 },
+  guideQR: { width: 200, height: 200 },
   corner: { position: 'absolute', width: 28, height: 28, borderColor: '#fb7185' },
   cTL: { top: 0, left: 0, borderTopWidth: 3, borderLeftWidth: 3, borderTopLeftRadius: 8 },
   cTR: { top: 0, right: 0, borderTopWidth: 3, borderRightWidth: 3, borderTopRightRadius: 8 },
   cBL: { bottom: 0, left: 0, borderBottomWidth: 3, borderLeftWidth: 3, borderBottomLeftRadius: 8 },
   cBR: { bottom: 0, right: 0, borderBottomWidth: 3, borderRightWidth: 3, borderBottomRightRadius: 8 },
-  scanHint: { color: '#fff', fontSize: 12, marginTop: 12, textAlign: 'center', textShadowColor: 'rgba(0,0,0,0.8)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4 },
+  scanHint: { color: '#fff', fontSize: 12, textAlign: 'center', textShadowColor: 'rgba(0,0,0,0.8)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4 },
+
+  // ── Toast ──
+  toast: { position: 'absolute', bottom: 12, left: 12, right: 12, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 14, paddingVertical: 10, borderRadius: 14 },
+  toastText: { color: '#fff', fontSize: 13, fontWeight: '600', flex: 1 },
+
+  // ── Searching overlay ──
+  searchingOverlay: { position: 'absolute', top: 12, left: '50%', marginLeft: -16, width: 32, height: 32, borderRadius: 16, backgroundColor: 'rgba(0,0,0,0.6)', alignItems: 'center', justifyContent: 'center' },
+
+  // ── Batch list ──
+  batchHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  batchItem: { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 12, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 8 },
+  batchItemImg: { width: 36, height: 36, borderRadius: 8, alignItems: 'center', justifyContent: 'center', borderWidth: 1, overflow: 'hidden' },
+
+  // ── Close cam button ──
+  closeCamBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderWidth: 1, borderRadius: 12, paddingVertical: 8, backgroundColor: 'rgba(248,113,113,0.06)' },
+
+  // ── Finish button ──
+  finishBtn: { height: 52, borderRadius: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 4 },
+
+  // ── Cart badge overlay ──
   cartBadgeOverlay: { position: 'absolute', top: 12, right: 12, backgroundColor: 'rgba(251,113,133,0.9)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },
-  foundBanner: { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 14, borderWidth: 1, padding: 12 },
-  foundRow: { flexDirection: 'row', gap: 12, alignItems: 'flex-start' },
-  foundImg: { width: 88, height: 88, borderRadius: 14, alignItems: 'center', justifyContent: 'center', overflow: 'hidden', borderWidth: 1 },
-  miniPill: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 20 },
-  addCartBtn: { height: 52, borderRadius: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
-  infoBanner: { borderRadius: 14, borderWidth: 1, padding: 12 },
-  notFoundIcon: { width: 64, height: 64, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
+
+  // ── Cart preview inline ──
   cartPreview: { borderRadius: 18, borderWidth: 1, padding: 16, gap: 8 },
   cartPreviewHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 },
   cartItem: { flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 14, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 10 },
   cartTotalRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderTopWidth: 1, paddingTop: 12, marginTop: 4 },
   confirmBtn: { height: 52, borderRadius: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 8 },
+
+  // ── Cart modal ──
   modalOv: { flex: 1, justifyContent: 'flex-end' },
   modalSheet: { borderTopLeftRadius: 24, borderTopRightRadius: 24, borderWidth: 1, borderBottomWidth: 0, maxHeight: '90%' },
   modalHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 16, borderBottomWidth: 1 },

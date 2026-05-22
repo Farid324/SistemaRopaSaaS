@@ -1,7 +1,7 @@
-// app_movil/src/context/AuthContext.tsx  (REEMPLAZA el existente)
+// app_movil/src/context/AuthContext.tsx
 
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
-import { File } from 'expo-file-system/next';
+
 import api, { tokenStorage } from '../services/api';
 
 export type Rol = 'SUPER_ADMIN' | 'OWNER_PRINCIPAL' | 'CO_OWNER' | 'ADMINISTRADOR' | 'EMPLEADO';
@@ -37,7 +37,7 @@ interface AuthState {
   cambiarPassword: (nuevaPassword: string) => Promise<boolean>;
   clearError: () => void;
   refreshUser: () => Promise<void>;
-  setProfilePhoto: (uri: string | null) => void;
+  setProfilePhoto: (uri: string | null, base64?: string | null) => void;
 }
 
 const AuthContext = createContext<AuthState>({} as AuthState);
@@ -69,26 +69,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   // ═══════════════════ PUNTO 1: Foto de perfil persistente ═══════════════════
-  const setProfilePhoto = useCallback(async (uri: string | null) => {
+  const setProfilePhoto = useCallback(async (uri: string | null, providedBase64?: string | null) => {
     setProfilePhotoState(uri);
 
     try {
       let base64Data: string | null = null;
 
       if (uri) {
-        // Convertir la imagen a base64 usando la nueva File API
-        const file = new File(uri);
-        const base64 = file.base64();
+        if (!providedBase64) {
+          throw new Error("Base64 string is required for profile photo");
+        }
         // Detectar tipo de imagen
         const extension = uri.split('.').pop()?.toLowerCase() || 'jpeg';
         const mimeType = extension === 'png' ? 'image/png' : 'image/jpeg';
-        base64Data = `data:${mimeType};base64,${base64}`;
+        base64Data = `data:${mimeType};base64,${providedBase64}`;
       }
 
       // Enviar al backend
       await api.post('/auth/actualizar-foto', { fotoPerfil: base64Data });
     } catch (error) {
-      console.error('Error subiendo foto de perfil:', error);
+      console.log('Error subiendo foto de perfil:', error);
       // La foto local se mantiene para UX, pero no persistirá
     }
   }, []);

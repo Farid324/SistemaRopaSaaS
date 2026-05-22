@@ -14,6 +14,7 @@ export interface Usuario {
   estado: Estado;
   sucursalId?: string;
   permisoEditarPrendas?: boolean;
+  fotoPerfil?: string;
   sucursal?: { nombre: string };
 }
 
