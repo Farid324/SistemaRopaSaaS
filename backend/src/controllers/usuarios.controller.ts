@@ -48,6 +48,15 @@ export const usuariosController = {
         return res.status(403).json({ message: 'Admin solo puede crear empleados' });
       }
 
+      // Validar si ya existe
+      const existingUser = await usuariosService.findByEmailOrCi(req.body.correo, req.body.ci);
+      if (existingUser) {
+        if (existingUser.estado === 'CERRADO') {
+          return res.status(409).json({ message: 'Este usuario fue eliminado anteriormente. ¿Desea reactivarlo?', reactivateId: existingUser.id });
+        }
+        return res.status(409).json({ message: 'CI o correo ya registrado' });
+      }
+
       const defaultSucursalId = isOwnerRole(user.rol) ? undefined : user.sucursalId;
       const usuario = await usuariosService.create(req.body, user.empresaId, defaultSucursalId, user.userId);
       res.status(201).json(usuario);
@@ -109,7 +118,7 @@ export const usuariosController = {
 
       await usuariosService.remove(id);
       res.json({ message: 'Usuario eliminado' });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Delete usuario error:', error);
       res.status(500).json({ message: 'Error al eliminar usuario' });
     }

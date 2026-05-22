@@ -14,7 +14,7 @@ const USUARIO_SELECT = {
 
 export const usuariosService = {
   async list(empresaId?: string, sucursalId?: string) {
-    const where: any = {};
+    const where: any = { estado: { not: 'CERRADO' } };
     if (empresaId) where.empresaId = empresaId;
     if (sucursalId) where.sucursalId = sucursalId;
 
@@ -82,10 +82,19 @@ export const usuariosService = {
   },
 
   async remove(id: string) {
-    return prisma.usuario.delete({ where: { id } });
+    return prisma.usuario.update({
+      where: { id },
+      data: { estado: 'CERRADO' }
+    });
   },
 
   async findById(id: string) {
     return prisma.usuario.findUnique({ where: { id } });
+  },
+
+  async findByEmailOrCi(correo: string, ci: string) {
+    return prisma.usuario.findFirst({
+      where: { OR: [{ correo }, { ci }] }
+    });
   },
 };

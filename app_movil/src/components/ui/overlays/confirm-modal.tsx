@@ -1,7 +1,7 @@
 // app_movil/src/components/ui/overlays/confirm-modal.tsx
 
-import React from 'react';
-import { View, Text, StyleSheet, Modal, TouchableOpacity } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, Modal, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../../context/ThemeContext';
@@ -21,6 +21,16 @@ interface ConfirmModalProps {
 
 export function ConfirmModal({ visible, title, message, icon, iconColor, iconBg, confirmLabel, confirmColor, onConfirm, onCancel }: ConfirmModalProps) {
   const { colors } = useTheme();
+  const [isLoading, setIsLoading] = useState(false);
+
+  const handleConfirm = async () => {
+    setIsLoading(true);
+    try {
+      await onConfirm();
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   if (!visible) return null;
 
@@ -34,12 +44,16 @@ export function ConfirmModal({ visible, title, message, icon, iconColor, iconBg,
           <Text style={[s.title, { color: colors.tx }]}>{title}</Text>
           <Text style={[s.message, { color: colors.tx3 }]}>{message}</Text>
           <View style={s.btnRow}>
-            <TouchableOpacity onPress={onCancel} activeOpacity={0.7} style={[s.cancelBtn, { backgroundColor: colors.fiSolid, borderColor: colors.bd }]}>
+            <TouchableOpacity onPress={onCancel} disabled={isLoading} activeOpacity={0.7} style={[s.cancelBtn, { backgroundColor: colors.fiSolid, borderColor: colors.bd }]}>
               <Text style={{ color: colors.tx3, fontSize: 14, fontWeight: '500' }}>Cancelar</Text>
             </TouchableOpacity>
-            <TouchableOpacity onPress={onConfirm} activeOpacity={0.85} style={{ flex: 1 }}>
-              <LinearGradient colors={confirmColor} style={s.confirmBtn}>
-                <Text style={{ color: '#fff', fontSize: 14, fontWeight: '600' }}>{confirmLabel}</Text>
+            <TouchableOpacity onPress={handleConfirm} disabled={isLoading} activeOpacity={0.85} style={{ flex: 1 }}>
+              <LinearGradient colors={confirmColor} style={[s.confirmBtn, isLoading && { opacity: 0.7 }]}>
+                {isLoading ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <Text style={{ color: '#fff', fontSize: 14, fontWeight: '600' }}>{confirmLabel}</Text>
+                )}
               </LinearGradient>
             </TouchableOpacity>
           </View>

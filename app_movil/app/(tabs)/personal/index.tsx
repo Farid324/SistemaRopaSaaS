@@ -3,7 +3,7 @@
 import React, { useState, useCallback } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  Modal, ActivityIndicator, RefreshControl, Alert, Image,
+  Modal, ActivityIndicator, RefreshControl, Image,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -18,10 +18,13 @@ import api from '../../../src/services/api';
 // Tipos y Modal separados
 import { Usuario, Sucursal, Rol } from '../../../src/types/personal/types';
 import { PersonalFormModal } from '../../../src/components/personal/PersonalFormModal';
+import { Input } from '../../../src/components/ui/forms/input';
+import { useToast } from '../../../src/components/ui/feedback/sonner';
 
 export default function PersonalScreen() {
   const { colors } = useTheme();
   const { currentUser } = useAuth();
+  const toast = useToast();
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
   const [sucursales, setSucursales] = useState<Sucursal[]>([]);
   const [loading, setLoading] = useState(true);
@@ -29,6 +32,12 @@ export default function PersonalScreen() {
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<Usuario | null>(null);
   const [confirmModal, setConfirmModal] = useState<ConfirmModalState>(INITIAL_CONFIRM_STATE);
+
+  // Estados para filtros
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filterRol, setFilterRol] = useState<string>('ALL');
+  const [filterEstado, setFilterEstado] = useState<string>('ALL');
+  const [filterSucursal, setFilterSucursal] = useState<string>('ALL');
 
   const isOwner = currentUser?.rol === 'OWNER_PRINCIPAL' || currentUser?.rol === 'CO_OWNER' || currentUser?.rol === 'SUPER_ADMIN';
 
@@ -61,9 +70,25 @@ export default function PersonalScreen() {
 
   // Filtrar: owner ve todos (excepto OWNER_PRINCIPAL y a sí mismo), admin solo empleados de su sucursal
   // OWNER_PRINCIPAL nunca aparece en la lista — es el dueño, no personal gestionable
-  const filtered = isOwner
+  let filtered = isOwner
     ? usuarios.filter((u) => u.id !== currentUser.id && u.rol !== 'OWNER_PRINCIPAL')
     : usuarios.filter((u) => u.rol === 'EMPLEADO' && u.sucursalId === currentUser.sucursalId);
+
+  if (searchQuery.trim()) {
+    const q = searchQuery.toLowerCase();
+    filtered = filtered.filter(u => u.nombreCompleto.toLowerCase().includes(q) || u.correo.toLowerCase().includes(q));
+  }
+  if (filterRol !== 'ALL') {
+    if (filterRol === 'DUEÑO') filtered = filtered.filter(u => u.rol === 'OWNER_PRINCIPAL' || u.rol === 'CO_OWNER');
+    else filtered = filtered.filter(u => u.rol === filterRol);
+  }
+  if (filterEstado !== 'ALL') {
+    filtered = filtered.filter(u => u.estado === filterEstado);
+  }
+  if (filterSucursal !== 'ALL') {
+    if (filterSucursal === 'NONE') filtered = filtered.filter(u => !u.sucursalId);
+    else filtered = filtered.filter(u => u.sucursalId === filterSucursal);
+  }
 
   // ── Acciones con backend ──
   const handleToggleEstado = async (user: Usuario) => {
@@ -82,8 +107,12 @@ export default function PersonalScreen() {
       onConfirm: async () => {
         try {
           await api.put(`/usuarios/${user.id}`, { estado: willBlock ? 'BLOQUEADO' : 'ACTIVO' });
-          fetchData();
-        } catch (error) { console.error('Error actualizando estado:', error); }
+          await fetchData();
+          toast.success(willBlock ? 'Usuario bloqueado exitosamente' : 'Usuario activado exitosamente');
+        } catch (error) { 
+          console.error('Error actualizando estado:', error);
+          toast.error('Error al actualizar estado'); 
+        }
         setConfirmModal(INITIAL_CONFIRM_STATE);
       },
     });
@@ -102,10 +131,11 @@ export default function PersonalScreen() {
       onConfirm: async () => {
         try {
           await api.delete(`/usuarios/${user.id}`);
-          fetchData();
+          await fetchData();
+          toast.success('Usuario eliminado exitosamente');
         } catch (error: any) { 
             const msg = error.response?.data?.message || 'No se pudo eliminar el usuario';
-            Alert.alert('Error', msg);
+            toast.error(msg);
             console.error('Error eliminando:', error); 
           }
         setConfirmModal(INITIAL_CONFIRM_STATE);
@@ -156,6 +186,70 @@ export default function PersonalScreen() {
             <Text style={{ color: '#fff', fontSize: 13, fontWeight: '600' }}>Agregar</Text>
           </LinearGradient>
         </TouchableOpacity>
+      </View>
+
+      <View style={{ gap: 12, marginBottom: 8 }}>
+        <Input 
+          icon="search-outline" 
+          placeholder="Buscar por nombre o correo..." 
+          value={searchQuery} 
+          onChangeText={setSearchQuery} 
+          containerStyle={{ marginBottom: 4 }}
+        />
+        
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
+          {(['ALL', 'EMPLEADO', 'ADMINISTRADOR', 'DUEÑO'] as const).map(rol => (
+            <TouchableOpacity 
+              key={`rol-${rol}`} 
+              onPress={() => setFilterRol(rol)}
+              style={[st.filterChip, { backgroundColor: filterRol === rol ? colors.acRose : colors.fiSolid, borderColor: filterRol === rol ? colors.acRose : colors.bd }]}
+            >
+              <Text style={{ color: filterRol === rol ? '#fff' : colors.tx3, fontSize: 12 }}>
+                {rol === 'ALL' ? 'Todos los roles' : rol === 'DUEÑO' ? 'Dueños' : rol === 'ADMINISTRADOR' ? 'Admins' : 'Empleados'}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
+          {(['ALL', 'ACTIVO', 'BLOQUEADO'] as const).map(estado => (
+            <TouchableOpacity 
+              key={`est-${estado}`} 
+              onPress={() => setFilterEstado(estado)}
+              style={[st.filterChip, { backgroundColor: filterEstado === estado ? colors.acRose : colors.fiSolid, borderColor: filterEstado === estado ? colors.acRose : colors.bd }]}
+            >
+              <Text style={{ color: filterEstado === estado ? '#fff' : colors.tx3, fontSize: 12 }}>
+                {estado === 'ALL' ? 'Todos los estados' : estado === 'ACTIVO' ? 'Activos' : 'Bloqueados'}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+
+        {isOwner && (
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
+            <TouchableOpacity 
+              onPress={() => setFilterSucursal('ALL')}
+              style={[st.filterChip, { backgroundColor: filterSucursal === 'ALL' ? colors.acRose : colors.fiSolid, borderColor: filterSucursal === 'ALL' ? colors.acRose : colors.bd }]}
+            >
+              <Text style={{ color: filterSucursal === 'ALL' ? '#fff' : colors.tx3, fontSize: 12 }}>Todas las sucursales</Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              onPress={() => setFilterSucursal('NONE')}
+              style={[st.filterChip, { backgroundColor: filterSucursal === 'NONE' ? colors.acRose : colors.fiSolid, borderColor: filterSucursal === 'NONE' ? colors.acRose : colors.bd }]}
+            >
+              <Text style={{ color: filterSucursal === 'NONE' ? '#fff' : colors.tx3, fontSize: 12 }}>Sin sucursal</Text>
+            </TouchableOpacity>
+            {sucursales.map(s => (
+              <TouchableOpacity 
+                key={`suc-${s.id}`} 
+                onPress={() => setFilterSucursal(s.id)}
+                style={[st.filterChip, { backgroundColor: filterSucursal === s.id ? colors.acRose : colors.fiSolid, borderColor: filterSucursal === s.id ? colors.acRose : colors.bd }]}
+              >
+                <Text style={{ color: filterSucursal === s.id ? '#fff' : colors.tx3, fontSize: 12 }}>{s.nombre}</Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        )}
       </View>
 
       <View style={{ gap: 10 }}>
@@ -245,13 +339,46 @@ export default function PersonalScreen() {
           currentSucursalId={currentUser.sucursalId}
           onSave={async (data) => {
             try {
-              if (editing) await api.put(`/usuarios/${editing.id}`, data);
-              else await api.post('/usuarios', data);
-              fetchData();
+              if (editing) {
+                await api.put(`/usuarios/${editing.id}`, data);
+                toast.success('Usuario actualizado exitosamente');
+              } else {
+                await api.post('/usuarios', data);
+                toast.success('Usuario registrado exitosamente');
+              }
+              await fetchData();
+              setShowForm(false);
             } catch (error: any) {
-              console.error('Error guardando:', error.response?.data?.message || error);
+              if (error.response?.data?.reactivateId) {
+                setConfirmModal({
+                  visible: true,
+                  title: 'Reactivar Usuario',
+                  message: error.response.data.message,
+                  icon: 'refresh-circle-outline',
+                  iconColor: colors.acSky,
+                  iconBg: 'rgba(56,189,248,0.15)',
+                  confirmLabel: 'Reactivar',
+                  confirmColor: ['#38bdf8', '#0284c7'],
+                  onConfirm: async () => {
+                    try {
+                      await api.put(`/usuarios/${error.response.data.reactivateId}`, { ...data, estado: 'ACTIVO' });
+                      toast.success('Usuario reactivado exitosamente');
+                      await fetchData();
+                      setShowForm(false);
+                      setConfirmModal(INITIAL_CONFIRM_STATE);
+                    } catch (e: any) {
+                      toast.error(e.response?.data?.message || 'No se pudo reactivar');
+                      setConfirmModal(INITIAL_CONFIRM_STATE);
+                    }
+                  },
+                });
+                return;
+              }
+              const msg = error.response?.data?.message || 'Error al guardar usuario';
+              toast.error(msg);
+              console.error('Error guardando:', msg);
+              throw error; // Lanzar para que el modal sepa que falló
             }
-            setShowForm(false);
           }}
           onClose={() => setShowForm(false)}
         />
@@ -273,4 +400,5 @@ const st = StyleSheet.create({
   userAvatarImg: { width: 40, height: 40, borderRadius: 20 },
   pill: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 20, borderWidth: 1 },
   iconBtn: { width: 32, height: 32, borderRadius: 8, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
+  filterChip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, borderWidth: 1 },
 });

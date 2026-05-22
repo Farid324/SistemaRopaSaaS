@@ -4,6 +4,7 @@ import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { ThemeProvider, useTheme } from '../src/context/ThemeContext';
 import { AuthProvider } from '../src/context/AuthContext';
+import { ToastProvider } from '../src/components/ui/feedback/sonner';
 
 function InnerLayout() {
   const { isDark } = useTheme();
@@ -24,7 +25,9 @@ export default function RootLayout() {
   return (
     <ThemeProvider>
       <AuthProvider>
-        <InnerLayout />
+        <ToastProvider>
+          <InnerLayout />
+        </ToastProvider>
       </AuthProvider>
     </ThemeProvider>
   );

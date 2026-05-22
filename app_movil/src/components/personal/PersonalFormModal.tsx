@@ -47,16 +47,23 @@ export function PersonalFormModal({ colors, isOwner, currentUserRol, editing, su
         : [{ v: 'EMPLEADO', l: 'Empleado' }];
 
   const needsSucursal = form.rol !== 'CO_OWNER' && form.rol !== 'OWNER_PRINCIPAL';
+  const [isSaving, setIsSaving] = useState(false);
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!form.nombreCompleto || !form.ci || !form.correo) { setError('Complete campos obligatorios'); return; }
     if (needsSucursal && !form.sucursalId) { setError('Seleccione una sucursal'); return; }
-    onSave({
-      ...form,
-      edad: form.edad ? parseInt(form.edad) : undefined,
-      estado: editing?.estado || 'ACTIVO',
-      sucursalId: needsSucursal ? form.sucursalId : undefined,
-    });
+    
+    setIsSaving(true);
+    try {
+      await onSave({
+        ...form,
+        edad: form.edad ? parseInt(form.edad) : undefined,
+        estado: editing?.estado || 'ACTIVO',
+        sucursalId: needsSucursal ? form.sucursalId : undefined,
+      });
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -145,7 +152,9 @@ export function PersonalFormModal({ colors, isOwner, currentUserRol, editing, su
             </View>
           )}
 
-          <Button variant="gradient" size="lg" onPress={handleSave}>{editing ? 'Guardar Cambios' : 'Registrar Personal'}</Button>
+          <Button variant="gradient" size="lg" onPress={handleSave} loading={isSaving}>
+            {editing ? 'Guardar Cambios' : 'Registrar Personal'}
+          </Button>
           <View style={{ height: 20 }} />
         </ScrollView>
       </View>
