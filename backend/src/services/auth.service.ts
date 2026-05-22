@@ -5,7 +5,13 @@ import { generateToken, hashPassword, comparePassword } from '../config/auth';
 
 export const authService = {
   async login(correo: string, password: string) {
-    const user = await prisma.usuario.findUnique({ where: { correo } });
+    const user = await prisma.usuario.findUnique({ 
+      where: { correo },
+      include: {
+        sucursal: { select: { nombre: true } },
+        empresa: { select: { nombre: true, planId: true } },
+      }
+    });
     if (!user) return { error: 'Credenciales incorrectas', status: 401 };
     if (user.estado !== 'ACTIVO') return { error: 'Cuenta bloqueada', status: 403 };
 
