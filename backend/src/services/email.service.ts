@@ -218,3 +218,79 @@ export async function sendWelcomeEmail(data: WelcomeEmailData): Promise<void> {
     // No lanzamos el error — la creación del usuario no debe fallar por el email
   }
 }
+
+// ── Template HTML para PIN ──
+function buildPinHtml(pin: string): string {
+  return `
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="margin:0;padding:0;background-color:#0f0f14;font-family:'Segoe UI',Roboto,Arial,sans-serif;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color:#0f0f14;padding:40px 20px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="520" cellspacing="0" cellpadding="0" style="background:linear-gradient(145deg,#1a1a24,#16161e);border-radius:24px;border:1px solid rgba(56,189,248,0.15);overflow:hidden;">
+          <tr>
+            <td style="background:linear-gradient(135deg,#38bdf8,#0284c7);padding:32px 40px;text-align:center;">
+              <h1 style="margin:0;color:#ffffff;font-size:22px;font-weight:700;letter-spacing:-0.5px;">
+                Recuperación de Contraseña
+              </h1>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:32px 40px;">
+              <p style="color:#e2e2ea;font-size:15px;margin:0 0 20px;line-height:1.6;">
+                Has solicitado restablecer tu contraseña. Ingresa el siguiente código de 6 dígitos en la aplicación:
+              </p>
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:rgba(56,189,248,0.06);border:1px solid rgba(56,189,248,0.15);border-radius:16px;margin-bottom:24px;text-align:center;">
+                <tr>
+                  <td style="padding:30px;">
+                    <code style="color:#38bdf8;font-size:32px;font-weight:700;letter-spacing:6px;">
+                      ${pin}
+                    </code>
+                  </td>
+                </tr>
+              </table>
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:rgba(251,191,36,0.08);border:1px solid rgba(251,191,36,0.15);border-radius:12px;">
+                <tr>
+                  <td style="padding:16px 20px;">
+                    <p style="margin:0;color:#fbbf24;font-size:13px;line-height:1.5;">
+                      ⚠️ <strong>Nota:</strong> Este código expira en 15 minutos. Si no solicitaste este código, ignora este mensaje.
+                    </p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+}
+
+// ── Función para enviar PIN de recuperación ──
+export async function sendPinEmail(destinatario: string, pin: string): Promise<void> {
+  if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
+    console.warn('⚠️  SMTP no configurado. No se envió PIN a:', destinatario);
+    return;
+  }
+
+  try {
+    await transporter.sendMail({
+      from: `"${FROM_NAME}" <${process.env.SMTP_USER}>`,
+      to: destinatario,
+      subject: `Código de recuperación de contraseña: ${pin}`,
+      html: buildPinHtml(pin),
+    });
+    console.log('✅ Correo de PIN enviado a:', destinatario);
+  } catch (error) {
+    console.error('❌ Error enviando correo de PIN a', destinatario, ':', error);
+    throw new Error('No se pudo enviar el correo de recuperación');
+  }
+}
+

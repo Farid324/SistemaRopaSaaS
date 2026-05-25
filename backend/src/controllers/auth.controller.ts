@@ -79,4 +79,55 @@ export const authController = {
       res.status(500).json({ message: 'Error al obtener perfil' });
     }
   },
+
+  // ════════════ RECUPERACIÓN DE CONTRASEÑA ════════════
+  async forgotPassword(req: Request, res: Response) {
+    try {
+      const { correo } = req.body;
+      if (!correo) return res.status(400).json({ message: 'Correo requerido' });
+
+      const result = await authService.generarPinRecuperacion(correo);
+      if ('error' in result) return res.status(result.status || 500).json({ message: result.error });
+
+      res.json({ message: 'PIN enviado al correo' });
+    } catch (error) {
+      console.error('Forgot password error:', error);
+      res.status(500).json({ message: 'Error al solicitar PIN' });
+    }
+  },
+
+  async verifyPin(req: Request, res: Response) {
+    try {
+      const { correo, pin } = req.body;
+      if (!correo || !pin) return res.status(400).json({ message: 'Correo y PIN requeridos' });
+
+      const result = await authService.verificarPinRecuperacion(correo, pin);
+      if ('error' in result) return res.status(result.status || 400).json({ message: result.error });
+
+      res.json({ message: 'PIN verificado correctamente' });
+    } catch (error) {
+      console.error('Verify PIN error:', error);
+      res.status(500).json({ message: 'Error al verificar PIN' });
+    }
+  },
+
+  async resetPassword(req: Request, res: Response) {
+    try {
+      const { correo, pin, nuevaPassword } = req.body;
+      if (!correo || !pin || !nuevaPassword) {
+        return res.status(400).json({ message: 'Correo, PIN y nueva contraseña requeridos' });
+      }
+      if (nuevaPassword.length < 6) {
+        return res.status(400).json({ message: 'Mínimo 6 caracteres' });
+      }
+
+      const result = await authService.resetearPassword(correo, pin, nuevaPassword);
+      if ('error' in result) return res.status(result.status || 400).json({ message: result.error });
+
+      res.json({ message: 'Contraseña restablecida exitosamente' });
+    } catch (error) {
+      console.error('Reset password error:', error);
+      res.status(500).json({ message: 'Error al restablecer contraseña' });
+    }
+  },
 };

@@ -110,6 +110,8 @@ model Usuario {
   rol                  Rol
   estado               EstadoGeneral @default(ACTIVO)
   permisoEditarPrendas Boolean       @default(false) // Solo relevante para EMPLEADO
+  resetPin             String?
+  resetPinExpires      DateTime?
 
   empresaId String
   empresa   Empresa @relation(fields: [empresaId], references: [id])
