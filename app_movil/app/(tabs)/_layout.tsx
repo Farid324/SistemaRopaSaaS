@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { View, Text, StyleSheet, Platform, Image, TouchableOpacity } from 'react-native';
-import { Tabs, Redirect } from 'expo-router';
+import { Tabs, Redirect, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '../../src/context/ThemeContext';
@@ -79,13 +79,15 @@ export default function TabsLayout() {
               {/* Indicador de notificación (opcional, se puede controlar con estado) */}
               <View style={st.notificationBadge} />
             </TouchableOpacity>
-            {profilePhoto ? (
-              <Image source={{ uri: profilePhoto }} style={st.avatarImg} />
-            ) : (
-              <LinearGradient colors={['#fb7185', '#f59e0b']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={st.avatar}>
-                <Text style={st.avatarText}>{currentUser.nombreCompleto.charAt(0)}</Text>
-              </LinearGradient>
-            )}
+            <TouchableOpacity activeOpacity={0.8} onPress={() => router.navigate('/(tabs)/perfil')}>
+              {profilePhoto ? (
+                <Image source={{ uri: profilePhoto }} style={st.avatarImg} />
+              ) : (
+                <LinearGradient colors={['#fb7185', '#f59e0b']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={st.avatar}>
+                  <Text style={st.avatarText}>{currentUser.nombreCompleto.charAt(0)}</Text>
+                </LinearGradient>
+              )}
+            </TouchableOpacity>
           </View>
         ),
         tabBarStyle: {
@@ -101,7 +103,6 @@ export default function TabsLayout() {
         tabBarLabelStyle: { fontSize: 9, marginTop: 2 },
       }}
     >
-      <Tabs.Screen name="index" options={{ href: null }} />
 
       {ALL_TABS.map((tab) => {
         const isVisible = visibleTabs.includes(tab.name);

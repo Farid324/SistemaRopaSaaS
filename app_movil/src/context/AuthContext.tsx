@@ -37,7 +37,7 @@ interface AuthState {
   cambiarPassword: (nuevaPassword: string) => Promise<boolean>;
   clearError: () => void;
   refreshUser: () => Promise<void>;
-  setProfilePhoto: (uri: string | null, base64?: string | null) => void;
+  setProfilePhoto: (uri: string | null, base64?: string | null) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthState>({} as AuthState);
@@ -90,6 +90,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch (error) {
       console.log('Error subiendo foto de perfil:', error);
       // La foto local se mantiene para UX, pero no persistirá
+      throw error;
     }
   }, []);
 

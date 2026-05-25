@@ -10,6 +10,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { useTheme } from '../../../src/context/ThemeContext';
 import { useAuth, Rol } from '../../../src/context/AuthContext';
+import { useToast } from '../../../src/components/ui/feedback/sonner';
 import { router } from 'expo-router';
 import api from '../../../src/services/api';
 
@@ -28,9 +29,11 @@ function getRolBadge(rol: Rol, colors: any) {
 export default function PerfilScreen() {
   const { colors, isDark, toggleTheme } = useTheme();
   const { currentUser, logout, profilePhoto, setProfilePhoto } = useAuth();
+  const toast = useToast();
 
   const [showChangePass, setShowChangePass] = useState(false);
-  const [showPasswords, setShowPasswords] = useState(false);
+  const [showPhotoModal, setShowPhotoModal] = useState(false);
+  const [showPasswords, setShowPasswords] = useState({ actual: false, nueva: false, confirmar: false });
   const [passForm, setPassForm] = useState({ actual: '', nueva: '', confirmar: '' });
   const [passError, setPassError] = useState('');
   const [passLoading, setPassLoading] = useState(false);
@@ -38,25 +41,58 @@ export default function PerfilScreen() {
   if (!currentUser) return null;
   const badge = getRolBadge(currentUser.rol, colors);
 
+  const checkImageAndSet = async (result: ImagePicker.ImagePickerResult) => {
+    if (result.canceled || !result.assets[0]) return;
+    const base64 = result.assets[0].base64;
+    if (!base64) return;
+    
+    // Calcular tamaño aproximado del base64 en bytes
+    const sizeInBytes = (base64.length * 3) / 4;
+    if (sizeInBytes > 10 * 1024 * 1024) { // 10 MB límite
+      toast.error('La imagen supera el límite de tamaño de 10MB.');
+      return;
+    }
+    
+    await setProfilePhoto(result.assets[0].uri, base64);
+    toast.success('Foto de perfil actualizada exitosamente');
+  };
+
   const pickPhoto = async () => {
-    const result = await ImagePicker.launchImageLibraryAsync({ allowsEditing: true, aspect: [1, 1], quality: 0.7, base64: true });
-    if (!result.canceled && result.assets[0]) setProfilePhoto(result.assets[0].uri, result.assets[0].base64);
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({ 
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true, aspect: [1, 1], quality: 0.7, base64: true 
+      });
+      await checkImageAndSet(result);
+    } catch (e: any) {
+      if (e.message?.includes('Network Error')) {
+        toast.error('Error de conexión o la imagen es muy pesada.');
+      } else {
+        toast.error('Error al actualizar la foto de perfil');
+      }
+    }
   };
 
   const takePhoto = async () => {
-    const perm = await ImagePicker.requestCameraPermissionsAsync();
-    if (!perm.granted) return;
-    const result = await ImagePicker.launchCameraAsync({ allowsEditing: true, aspect: [1, 1], quality: 0.7, base64: true });
-    if (!result.canceled && result.assets[0]) setProfilePhoto(result.assets[0].uri, result.assets[0].base64);
+    try {
+      const perm = await ImagePicker.requestCameraPermissionsAsync();
+      if (!perm.granted) return;
+      const result = await ImagePicker.launchCameraAsync({ 
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true, aspect: [1, 1], quality: 0.7, base64: true 
+      });
+      await checkImageAndSet(result);
+    } catch (e: any) {
+      if (e.message?.includes('Network Error')) {
+        toast.error('Error de conexión o la imagen es muy pesada.');
+      } else {
+        toast.error('Error al actualizar la foto de perfil');
+      }
+    }
   };
 
   const showPhotoOptions = () => {
-    Alert.alert('Foto de perfil', 'Elige una opción', [
-      { text: 'Cámara', onPress: takePhoto },
-      { text: 'Galería', onPress: pickPhoto },
-      ...(profilePhoto ? [{ text: 'Quitar foto', style: 'destructive' as const, onPress: () => setProfilePhoto(null) }] : []),
-      { text: 'Cancelar', style: 'cancel' as const },
-    ]);
+    setShowPhotoModal(true);
   };
 
   const handleChangePass = async () => {
@@ -65,7 +101,7 @@ export default function PerfilScreen() {
     setPassLoading(true);
     try {
       await api.post('/auth/cambiar-contrasena', { contrasenaActual: passForm.actual, nuevaContrasena: passForm.nueva });
-      Alert.alert('Listo', 'Contraseña cambiada correctamente');
+      toast.success('¡Listo!', 'Contraseña cambiada correctamente');
       setShowChangePass(false);
       setPassForm({ actual: '', nueva: '', confirmar: '' });
     } catch (error: any) {
@@ -162,15 +198,15 @@ export default function PerfilScreen() {
                     style={[st.modalInput, { backgroundColor: colors.fiSolid, borderColor: colors.bd2Solid, color: colors.tx, paddingRight: 40 }]} 
                     placeholder={ph} 
                     placeholderTextColor={colors.tx4} 
-                    secureTextEntry={!showPasswords} 
+                    secureTextEntry={!showPasswords[key]} 
                     value={passForm[key]} 
                     onChangeText={(t) => { setPassForm({ ...passForm, [key]: t }); setPassError(''); }} 
                   />
                   <TouchableOpacity 
                     style={{ position: 'absolute', right: 12 }} 
-                    onPress={() => setShowPasswords(!showPasswords)}
+                    onPress={() => setShowPasswords(prev => ({ ...prev, [key]: !prev[key] }))}
                   >
-                    <Ionicons name={showPasswords ? "eye-off-outline" : "eye-outline"} size={20} color={colors.tx4} />
+                    <Ionicons name={showPasswords[key] ? "eye-off-outline" : "eye-outline"} size={20} color={colors.tx4} />
                   </TouchableOpacity>
                 </View>
               );
@@ -188,6 +224,48 @@ export default function PerfilScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* Modal Foto de Perfil */}
+      <Modal visible={showPhotoModal} transparent animationType="fade">
+        <View style={st.modalOv}>
+          <View style={[st.modalBox, { backgroundColor: colors.cdSolid, borderColor: colors.bd2Solid, padding: 0, overflow: 'hidden' }]}>
+            <View style={{ padding: 20, borderBottomWidth: 1, borderBottomColor: colors.bd }}>
+              <Text style={{ color: colors.tx, fontSize: 16, fontWeight: '600', textAlign: 'center' }}>Foto de perfil</Text>
+              <Text style={{ color: colors.tx3, fontSize: 13, textAlign: 'center', marginTop: 4 }}>Elige una opción</Text>
+            </View>
+            
+            <TouchableOpacity onPress={() => { setShowPhotoModal(false); takePhoto(); }} style={{ padding: 16, borderBottomWidth: 1, borderBottomColor: colors.bd, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+              <Ionicons name="camera-outline" size={20} color={colors.acSky} />
+              <Text style={{ color: colors.tx, fontSize: 15 }}>Tomar foto</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity onPress={() => { setShowPhotoModal(false); pickPhoto(); }} style={{ padding: 16, borderBottomWidth: 1, borderBottomColor: colors.bd, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+              <Ionicons name="image-outline" size={20} color={colors.acRose} />
+              <Text style={{ color: colors.tx, fontSize: 15 }}>Elegir de galería</Text>
+            </TouchableOpacity>
+
+            {profilePhoto && (
+              <TouchableOpacity onPress={async () => {
+                setShowPhotoModal(false);
+                try {
+                  await setProfilePhoto(null);
+                  toast.success('Foto de perfil eliminada exitosamente');
+                } catch (e) {
+                  toast.error('Error al eliminar la foto');
+                }
+              }} style={{ padding: 16, borderBottomWidth: 1, borderBottomColor: colors.bd, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                <Ionicons name="trash-outline" size={20} color={colors.acRed} />
+                <Text style={{ color: colors.acRed, fontSize: 15 }}>Quitar foto</Text>
+              </TouchableOpacity>
+            )}
+
+            <TouchableOpacity onPress={() => setShowPhotoModal(false)} style={{ padding: 16, alignItems: 'center', backgroundColor: colors.fiSolid }}>
+              <Text style={{ color: colors.tx3, fontSize: 15, fontWeight: '500' }}>Cancelar</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
     </ScrollView>
   );
 }

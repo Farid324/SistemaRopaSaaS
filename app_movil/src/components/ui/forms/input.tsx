@@ -10,9 +10,10 @@ interface InputProps extends TextInputProps {
   error?: string;
   icon?: keyof typeof Ionicons.glyphMap;
   containerStyle?: ViewStyle;
+  rightElement?: React.ReactNode;
 }
  
-export function Input({ label, error, icon, containerStyle, style, ...props }: InputProps) {
+export function Input({ label, error, icon, containerStyle, style, rightElement, ...props }: InputProps) {
   const { colors, isDark } = useTheme();
   const [focused, setFocused] = useState(false);
  
@@ -34,6 +35,7 @@ export function Input({ label, error, icon, containerStyle, style, ...props }: I
           onBlur={(e) => { setFocused(false); props.onBlur?.(e); }}
           {...props}
         />
+        {rightElement}
       </View>
       {error && <Text style={[styles.error, { color: colors.acRed }]}>{error}</Text>}
     </View>

@@ -38,6 +38,7 @@ export default function PersonalScreen() {
   const [filterRol, setFilterRol] = useState<string>('ALL');
   const [filterEstado, setFilterEstado] = useState<string>('ALL');
   const [filterSucursal, setFilterSucursal] = useState<string>('ALL');
+  const [activeFilterMenu, setActiveFilterMenu] = useState<'rol' | 'estado' | 'sucursal' | null>(null);
 
   const isOwner = currentUser?.rol === 'OWNER_PRINCIPAL' || currentUser?.rol === 'CO_OWNER' || currentUser?.rol === 'SUPER_ADMIN';
 
@@ -197,58 +198,94 @@ export default function PersonalScreen() {
           containerStyle={{ marginBottom: 4 }}
         />
         
+        {/* Main Filter Buttons Row */}
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
-          {(['ALL', 'EMPLEADO', 'ADMINISTRADOR', 'DUEÑO'] as const).map(rol => (
+          <TouchableOpacity 
+            onPress={() => setActiveFilterMenu(activeFilterMenu === 'rol' ? null : 'rol')}
+            style={[st.filterChip, { backgroundColor: activeFilterMenu === 'rol' ? colors.acRose : colors.fiSolid, borderColor: activeFilterMenu === 'rol' ? colors.acRose : colors.bd }]}
+          >
+            <Text style={{ color: activeFilterMenu === 'rol' ? '#fff' : colors.tx3, fontSize: 12 }}>
+              {filterRol === 'ALL' ? 'Todos los roles' : filterRol === 'DUEÑO' ? 'Dueños' : filterRol === 'ADMINISTRADOR' ? 'Admins' : 'Empleados'}
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity 
+            onPress={() => setActiveFilterMenu(activeFilterMenu === 'estado' ? null : 'estado')}
+            style={[st.filterChip, { backgroundColor: activeFilterMenu === 'estado' ? colors.acRose : colors.fiSolid, borderColor: activeFilterMenu === 'estado' ? colors.acRose : colors.bd }]}
+          >
+            <Text style={{ color: activeFilterMenu === 'estado' ? '#fff' : colors.tx3, fontSize: 12 }}>
+              {filterEstado === 'ALL' ? 'Todos los estados' : filterEstado === 'ACTIVO' ? 'Activos' : 'Bloqueados'}
+            </Text>
+          </TouchableOpacity>
+
+          {isOwner && (
             <TouchableOpacity 
-              key={`rol-${rol}`} 
-              onPress={() => setFilterRol(rol)}
-              style={[st.filterChip, { backgroundColor: filterRol === rol ? colors.acRose : colors.fiSolid, borderColor: filterRol === rol ? colors.acRose : colors.bd }]}
+              onPress={() => setActiveFilterMenu(activeFilterMenu === 'sucursal' ? null : 'sucursal')}
+              style={[st.filterChip, { backgroundColor: activeFilterMenu === 'sucursal' ? colors.acRose : colors.fiSolid, borderColor: activeFilterMenu === 'sucursal' ? colors.acRose : colors.bd }]}
             >
-              <Text style={{ color: filterRol === rol ? '#fff' : colors.tx3, fontSize: 12 }}>
-                {rol === 'ALL' ? 'Todos los roles' : rol === 'DUEÑO' ? 'Dueños' : rol === 'ADMINISTRADOR' ? 'Admins' : 'Empleados'}
+              <Text style={{ color: activeFilterMenu === 'sucursal' ? '#fff' : colors.tx3, fontSize: 12 }}>
+                {filterSucursal === 'ALL' ? 'Todas las sucursales' : filterSucursal === 'NONE' ? 'Sin sucursal' : sucursales.find(s => s.id === filterSucursal)?.nombre || 'Sucursal'}
               </Text>
             </TouchableOpacity>
-          ))}
+          )}
         </ScrollView>
 
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
-          {(['ALL', 'ACTIVO', 'BLOQUEADO'] as const).map(estado => (
-            <TouchableOpacity 
-              key={`est-${estado}`} 
-              onPress={() => setFilterEstado(estado)}
-              style={[st.filterChip, { backgroundColor: filterEstado === estado ? colors.acRose : colors.fiSolid, borderColor: filterEstado === estado ? colors.acRose : colors.bd }]}
-            >
-              <Text style={{ color: filterEstado === estado ? '#fff' : colors.tx3, fontSize: 12 }}>
-                {estado === 'ALL' ? 'Todos los estados' : estado === 'ACTIVO' ? 'Activos' : 'Bloqueados'}
-              </Text>
+        {/* Sub-menu Row (Active Options) */}
+        {activeFilterMenu && (
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4, paddingVertical: 8, paddingHorizontal: 12, backgroundColor: 'rgba(251,113,133,0.05)', borderRadius: 14, borderWidth: 1, borderColor: 'rgba(251,113,133,0.2)' }}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
+              {activeFilterMenu === 'rol' && (['ALL', 'EMPLEADO', 'ADMINISTRADOR', 'DUEÑO'] as const).map(rol => (
+                <TouchableOpacity 
+                  key={`rol-${rol}`} 
+                  onPress={() => { setFilterRol(rol); setActiveFilterMenu(null); }}
+                  style={[st.subFilterChip, { backgroundColor: filterRol === rol ? colors.acRose : colors.fiSolid, borderColor: filterRol === rol ? colors.acRose : colors.bd }]}
+                >
+                  <Text style={{ color: filterRol === rol ? '#fff' : colors.tx3, fontSize: 12 }}>
+                    {rol === 'ALL' ? 'Todos los roles' : rol === 'DUEÑO' ? 'Dueños' : rol === 'ADMINISTRADOR' ? 'Admins' : 'Empleados'}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+              {activeFilterMenu === 'estado' && (['ALL', 'ACTIVO', 'BLOQUEADO'] as const).map(estado => (
+                <TouchableOpacity 
+                  key={`est-${estado}`} 
+                  onPress={() => { setFilterEstado(estado); setActiveFilterMenu(null); }}
+                  style={[st.subFilterChip, { backgroundColor: filterEstado === estado ? colors.acRose : colors.fiSolid, borderColor: filterEstado === estado ? colors.acRose : colors.bd }]}
+                >
+                  <Text style={{ color: filterEstado === estado ? '#fff' : colors.tx3, fontSize: 12 }}>
+                    {estado === 'ALL' ? 'Todos los estados' : estado === 'ACTIVO' ? 'Activos' : 'Bloqueados'}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+              {activeFilterMenu === 'sucursal' && isOwner && (
+                <>
+                  <TouchableOpacity 
+                    onPress={() => { setFilterSucursal('ALL'); setActiveFilterMenu(null); }}
+                    style={[st.subFilterChip, { backgroundColor: filterSucursal === 'ALL' ? colors.acRose : colors.fiSolid, borderColor: filterSucursal === 'ALL' ? colors.acRose : colors.bd }]}
+                  >
+                    <Text style={{ color: filterSucursal === 'ALL' ? '#fff' : colors.tx3, fontSize: 12 }}>Todas</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity 
+                    onPress={() => { setFilterSucursal('NONE'); setActiveFilterMenu(null); }}
+                    style={[st.subFilterChip, { backgroundColor: filterSucursal === 'NONE' ? colors.acRose : colors.fiSolid, borderColor: filterSucursal === 'NONE' ? colors.acRose : colors.bd }]}
+                  >
+                    <Text style={{ color: filterSucursal === 'NONE' ? '#fff' : colors.tx3, fontSize: 12 }}>Ninguna</Text>
+                  </TouchableOpacity>
+                  {sucursales.map(s => (
+                    <TouchableOpacity 
+                      key={`suc-${s.id}`} 
+                      onPress={() => { setFilterSucursal(s.id); setActiveFilterMenu(null); }}
+                      style={[st.subFilterChip, { backgroundColor: filterSucursal === s.id ? colors.acRose : colors.fiSolid, borderColor: filterSucursal === s.id ? colors.acRose : colors.bd }]}
+                    >
+                      <Text style={{ color: filterSucursal === s.id ? '#fff' : colors.tx3, fontSize: 12 }}>{s.nombre}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </>
+              )}
+            </ScrollView>
+            <TouchableOpacity onPress={() => setActiveFilterMenu(null)} style={{ padding: 4, backgroundColor: colors.cdSolid, borderRadius: 12, borderWidth: 1, borderColor: colors.bd, marginLeft: 'auto' }}>
+              <Ionicons name="close" size={16} color={colors.tx4} />
             </TouchableOpacity>
-          ))}
-        </ScrollView>
-
-        {isOwner && (
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
-            <TouchableOpacity 
-              onPress={() => setFilterSucursal('ALL')}
-              style={[st.filterChip, { backgroundColor: filterSucursal === 'ALL' ? colors.acRose : colors.fiSolid, borderColor: filterSucursal === 'ALL' ? colors.acRose : colors.bd }]}
-            >
-              <Text style={{ color: filterSucursal === 'ALL' ? '#fff' : colors.tx3, fontSize: 12 }}>Todas las sucursales</Text>
-            </TouchableOpacity>
-            <TouchableOpacity 
-              onPress={() => setFilterSucursal('NONE')}
-              style={[st.filterChip, { backgroundColor: filterSucursal === 'NONE' ? colors.acRose : colors.fiSolid, borderColor: filterSucursal === 'NONE' ? colors.acRose : colors.bd }]}
-            >
-              <Text style={{ color: filterSucursal === 'NONE' ? '#fff' : colors.tx3, fontSize: 12 }}>Sin sucursal</Text>
-            </TouchableOpacity>
-            {sucursales.map(s => (
-              <TouchableOpacity 
-                key={`suc-${s.id}`} 
-                onPress={() => setFilterSucursal(s.id)}
-                style={[st.filterChip, { backgroundColor: filterSucursal === s.id ? colors.acRose : colors.fiSolid, borderColor: filterSucursal === s.id ? colors.acRose : colors.bd }]}
-              >
-                <Text style={{ color: filterSucursal === s.id ? '#fff' : colors.tx3, fontSize: 12 }}>{s.nombre}</Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
+          </View>
         )}
       </View>
 
@@ -401,4 +438,5 @@ const st = StyleSheet.create({
   pill: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 20, borderWidth: 1 },
   iconBtn: { width: 32, height: 32, borderRadius: 8, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
   filterChip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, borderWidth: 1 },
+  subFilterChip: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16, borderWidth: 1 },
 });

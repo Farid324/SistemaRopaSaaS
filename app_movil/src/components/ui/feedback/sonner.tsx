@@ -3,6 +3,7 @@
 import React, { useEffect, useRef, createContext, useContext, useState, useCallback } from 'react';
 import { View, Text, Animated, TouchableOpacity, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 import { useTheme } from '../utils';
  
 type ToastType = 'default' | 'success' | 'error' | 'warning';
@@ -23,6 +24,17 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
     const id = String(++counter.current);
     setToasts((prev) => [...prev, { ...opts, id }]);
     setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), opts.duration || 3000);
+    
+    // Play haptic feedback
+    if (opts.type === 'success') {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } else if (opts.type === 'error') {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+    } else if (opts.type === 'warning') {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+    } else {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    }
   }, []);
  
   const ctx: ToastContextType = {

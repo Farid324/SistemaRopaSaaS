@@ -10,11 +10,12 @@ import { Sucursal } from '../../types/sucursales/types';
 interface Props {
   colors: any;
   editing: Sucursal | null;
-  onSave: (d: any) => void;
+  onSave: (d: any) => Promise<void>;
   onClose: () => void;
 }
 
 export function SucursalFormModal({ colors, editing, onSave, onClose }: Props) {
+  const [loading, setLoading] = useState(false);
   const [form, setForm] = useState({ 
     nombre: editing?.nombre || '', 
     detalles: editing?.detalles || '', 
@@ -24,9 +25,14 @@ export function SucursalFormModal({ colors, editing, onSave, onClose }: Props) {
     maxAdministradores: editing?.maxAdministradores?.toString() || '2' 
   });
 
-  const handleSave = () => { 
+  const handleSave = async () => { 
     if (!form.nombre || !form.direccion) return; 
-    onSave({ ...form, maxAdministradores: parseInt(form.maxAdministradores) || 2 }); 
+    setLoading(true);
+    try {
+      await onSave({ ...form, maxAdministradores: parseInt(form.maxAdministradores) || 2 }); 
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -55,7 +61,7 @@ export function SucursalFormModal({ colors, editing, onSave, onClose }: Props) {
               ))}
             </View>
           </View>
-          <Button variant="gradient" size="lg" onPress={handleSave}>{editing ? 'Guardar Cambios' : 'Crear Sucursal'}</Button>
+          <Button variant="gradient" size="lg" onPress={handleSave} loading={loading}>{editing ? 'Guardar Cambios' : 'Crear Sucursal'}</Button>
           <View style={{ height: 20 }} />
         </ScrollView>
       </View>

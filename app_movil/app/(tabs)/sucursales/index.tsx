@@ -3,7 +3,7 @@
 import React, { useState, useCallback } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  Modal, ActivityIndicator, RefreshControl
+  Modal, ActivityIndicator, RefreshControl, TextInput
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -12,6 +12,7 @@ import { useFocusEffect } from 'expo-router';
 import { useTheme } from '../../../src/context/ThemeContext';
 import { useAuth } from '../../../src/context/AuthContext';
 import api from '../../../src/services/api';
+import { useToast } from '../../../src/components/ui/feedback/sonner';
 
 // Tipos y Modales separados
 import { Sucursal } from '../../../src/types/sucursales/types';
@@ -21,12 +22,14 @@ import { DeleteSucursalModal } from '../../../src/components/sucursales/DeleteSu
 export default function SucursalesScreen() {
   const { colors } = useTheme();
   const { currentUser } = useAuth();
+  const toast = useToast();
   const [sucursales, setSucursales] = useState<Sucursal[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<Sucursal | null>(null);
   const [deletingSuc, setDeletingSuc] = useState<Sucursal | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
 
   const fetchSucursales = useCallback(async () => {
     try { 
@@ -44,6 +47,7 @@ export default function SucursalesScreen() {
   const handleDelete = async () => {
     if (!deletingSuc) return;
     await api.delete(`/sucursales/${deletingSuc.id}`);
+    toast.success('Sucursal eliminada exitosamente');
     fetchSucursales();
     setDeletingSuc(null);
   };
@@ -64,8 +68,24 @@ export default function SucursalesScreen() {
         </TouchableOpacity>
       </View>
 
+      <View style={[st.searchContainer, { backgroundColor: colors.fiSolid, borderColor: colors.bd2Solid }]}>
+        <Ionicons name="search" size={18} color={colors.tx4} />
+        <TextInput
+          style={[st.searchInput, { color: colors.tx }]}
+          placeholder="Buscar sucursal por nombre..."
+          placeholderTextColor={colors.tx4}
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+        />
+        {searchQuery.length > 0 && (
+          <TouchableOpacity onPress={() => setSearchQuery('')} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+            <Ionicons name="close-circle" size={18} color={colors.tx4} />
+          </TouchableOpacity>
+        )}
+      </View>
+
       <View style={{ gap: 10 }}>
-        {sucursales.map((s) => {
+        {sucursales.filter(s => s.nombre.toLowerCase().includes(searchQuery.toLowerCase())).map((s) => {
           const isOpen = s.estado === 'ACTIVO';
           return (
             <View key={s.id} style={[st.sucCard, { backgroundColor: colors.cdSolid, borderColor: colors.bd2Solid, ...colors.cardShadow }]}>
@@ -100,10 +120,18 @@ export default function SucursalesScreen() {
           editing={editing}
           onSave={async (data) => { 
             try { 
-              if (editing) await api.put(`/sucursales/${editing.id}`, data); 
-              else await api.post('/sucursales', data); 
+              if (editing) {
+                await api.put(`/sucursales/${editing.id}`, data); 
+                toast.success('Sucursal actualizada exitosamente');
+              } else {
+                await api.post('/sucursales', data); 
+                toast.success('Sucursal creada exitosamente');
+              }
               fetchSucursales(); 
-            } catch (e) { console.error(e); } 
+            } catch (e) { 
+              console.error(e); 
+              toast.error('Error al guardar la sucursal');
+            } 
             setShowForm(false); 
           }}
           onClose={() => setShowForm(false)} 
@@ -124,6 +152,8 @@ export default function SucursalesScreen() {
 
 const st = StyleSheet.create({
   container: { flex: 1 }, content: { padding: 16, paddingBottom: 100, gap: 14 },
+  searchContainer: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, height: 46, borderRadius: 14, borderWidth: 1, gap: 8 },
+  searchInput: { flex: 1, fontSize: 14 },
   headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   title: { fontSize: 17, fontWeight: '600' },
   addBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 14, paddingVertical: 10, borderRadius: 14 },

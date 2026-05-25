@@ -12,6 +12,7 @@ import { useTheme } from '../../../src/context/ThemeContext';
 import { useAuth } from '../../../src/context/AuthContext';
 import { ConfirmModal, ConfirmModalState, INITIAL_CONFIRM_STATE } from '../../../src/components/ui/overlays/confirm-modal';
 import api from '../../../src/services/api';
+import { useToast } from '../../../src/components/ui/feedback/sonner';
 import type { Prenda, Sucursal, TipoCodigo, EstadoVenta } from '../../../src/types/inventario/types';
 import ScannerModal from '../../../src/components/inventario/ScannerModal';
 import PrendaFormModal from '../../../src/components/inventario/PrendaFormModal';
@@ -23,6 +24,7 @@ const CARD_W = (SCREEN_W - 16 * 2 - 12) / 2;
 export default function InventarioScreen() {
   const { colors } = useTheme();
   const { currentUser } = useAuth();
+  const toast = useToast();
 
   const [prendas, setPrendas] = useState<Prenda[]>([]);
   const [sucursales, setSucursales] = useState<Sucursal[]>([]);
@@ -67,10 +69,18 @@ export default function InventarioScreen() {
 
   const handleSavePrenda = async (data: any) => {
     try {
-      if (editingPrenda) await api.put(`/prendas/${editingPrenda.id}`, data);
-      else await api.post('/prendas', data);
+      if (editingPrenda) {
+        await api.put(`/prendas/${editingPrenda.id}`, data);
+        toast.success('Prenda actualizada exitosamente');
+      } else {
+        await api.post('/prendas', data);
+        toast.success('Prenda registrada exitosamente');
+      }
       fetchData();
-    } catch (error: any) { console.error('Error guardando prenda:', error.response?.data?.message || error); }
+    } catch (error: any) { 
+      console.error('Error guardando prenda:', error.response?.data?.message || error);
+      toast.error('Error al guardar la prenda');
+    }
     setFlowStep('none');
   };
 
@@ -81,7 +91,14 @@ export default function InventarioScreen() {
       icon: 'pricetag-outline', iconColor: colors.acRed, iconBg: 'rgba(248,113,113,0.15)',
       confirmLabel: 'Eliminar', confirmColor: ['#f87171', '#dc2626'],
       onConfirm: async () => {
-        try { await api.delete(`/prendas/${prenda.id}`); fetchData(); } catch (error) { console.error('Error eliminando:', error); }
+        try { 
+          await api.delete(`/prendas/${prenda.id}`); 
+          toast.success('Prenda eliminada exitosamente');
+          fetchData(); 
+        } catch (error) { 
+          console.error('Error eliminando:', error); 
+          toast.error('Error al eliminar la prenda');
+        }
         setConfirmModal(INITIAL_CONFIRM_STATE);
       },
     });

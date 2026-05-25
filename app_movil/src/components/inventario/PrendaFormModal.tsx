@@ -19,12 +19,13 @@ interface Props {
   sucursales: Sucursal[];
   isOwner: boolean;
   currentSucursalId?: string;
-  onSave: (data: any) => void;
+  onSave: (data: any) => Promise<void>;
   onClose: () => void;
 }
 
 export default function PrendaFormModal({ editing, scannedCode, scannedType, sucursales, isOwner, currentSucursalId, onSave, onClose }: Props) {
   const { colors } = useTheme();
+  const [loading, setLoading] = useState(false);
   const [marca, setMarca] = useState(editing?.marca || '');
   const [tipo, setTipo] = useState(editing?.tipo || '');
   const [customTipo, setCustomTipo] = useState('');
@@ -65,17 +66,23 @@ export default function PrendaFormModal({ editing, scannedCode, scannedType, suc
     setError('');
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     const finalTipo = customTipo.trim() || tipo;
     if (!finalTipo || !precio) { setError('Completa los campos obligatorios'); return; }
-    onSave({
-      marca: marca || null, tipo: finalTipo, codigo: scannedCode, tipoCodigo: scannedType,
-      detalles: detalles || null, estado, precio: parseFloat(precio),
-      rebaja: rebajaActiva && rebaja ? parseFloat(rebaja) : null,
-      sucursalId, estadoVenta: editing?.estadoVenta || 'DISPONIBLE',
-      publicadoWeb: editing?.publicadoWeb || false,
-      foto: foto || null,
-    });
+    
+    setLoading(true);
+    try {
+      await onSave({
+        marca: marca || null, tipo: finalTipo, codigo: scannedCode, tipoCodigo: scannedType,
+        detalles: detalles || null, estado, precio: parseFloat(precio),
+        rebaja: rebajaActiva && rebaja ? parseFloat(rebaja) : null,
+        sucursalId, estadoVenta: editing?.estadoVenta || 'DISPONIBLE',
+        publicadoWeb: editing?.publicadoWeb || false,
+        foto: foto || null,
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -247,7 +254,7 @@ export default function PrendaFormModal({ editing, scannedCode, scannedType, suc
               </View>
             </View>
 
-            <Button variant="gradient" size="lg" onPress={handleSave}>{editing ? 'Guardar Cambios' : 'Registrar Prenda'}</Button>
+            <Button variant="gradient" size="lg" onPress={handleSave} loading={loading}>{editing ? 'Guardar Cambios' : 'Registrar Prenda'}</Button>
             <View style={{ height: 20 }} />
           </ScrollView>
         </View>

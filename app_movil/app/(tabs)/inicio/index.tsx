@@ -56,9 +56,9 @@ export default function HomeScreen() {
   const fetchDashboardData = useCallback(async () => {
     try {
       const [vRes, pRes, sRes, uRes, planRes] = await Promise.all([
-        api.get('/ventas'),
-        api.get('/prendas'),
-        api.get('/sucursales'),
+        api.get('/ventas').catch(e => { console.error('ventas fail:', e); throw e; }),
+        api.get('/prendas').catch(e => { console.error('prendas fail:', e); throw e; }),
+        api.get('/sucursales').catch(e => { console.error('sucursales fail:', e); throw e; }),
         api.get('/usuarios').catch(() => ({ data: [] })),
         api.get('/dashboard/plan-actual').catch(() => ({ data: null })),
       ]);
