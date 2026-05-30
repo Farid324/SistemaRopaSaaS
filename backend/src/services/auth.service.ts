@@ -6,8 +6,9 @@ import { sendPinEmail } from './email.service';
 
 export const authService = {
   async login(correo: string, password: string) {
-    const user = await prisma.usuario.findUnique({ 
-      where: { correo },
+    // correo ya no es único global — buscar el usuario ACTIVO con ese correo
+    const user = await prisma.usuario.findFirst({ 
+      where: { correo, estado: 'ACTIVO' },
       include: {
         sucursal: { select: { nombre: true } },
         empresa: { select: { nombre: true, planId: true } },
@@ -94,8 +95,8 @@ export const authService = {
 
   // ════════════ RECUPERACIÓN DE CONTRASEÑA ════════════
   async generarPinRecuperacion(correo: string) {
-    const user = await prisma.usuario.findUnique({ where: { correo } });
-    if (!user) return { error: 'No existe una cuenta con este correo', status: 404 };
+    const user = await prisma.usuario.findFirst({ where: { correo, estado: 'ACTIVO' } });
+    if (!user) return { error: 'No existe una cuenta activa con este correo', status: 404 };
     if (user.estado !== 'ACTIVO') return { error: 'La cuenta no está activa o fue eliminada', status: 403 };
 
     // Generar PIN de 6 dígitos
@@ -104,7 +105,7 @@ export const authService = {
     expires.setMinutes(expires.getMinutes() + 15); // Expira en 15 mins
 
     await prisma.usuario.update({
-      where: { correo },
+      where: { id: user.id },
       data: { resetPin: pin, resetPinExpires: expires },
     });
 
@@ -114,7 +115,7 @@ export const authService = {
   },
 
   async verificarPinRecuperacion(correo: string, pin: string) {
-    const user = await prisma.usuario.findUnique({ where: { correo } });
+    const user = await prisma.usuario.findFirst({ where: { correo, estado: 'ACTIVO' } });
     if (!user) return { error: 'Usuario no encontrado', status: 404 };
 
     if (!user.resetPin || user.resetPin !== pin) {
@@ -131,8 +132,11 @@ export const authService = {
     const check = await this.verificarPinRecuperacion(correo, pin);
     if ('error' in check) return check;
 
+    const user = await prisma.usuario.findFirst({ where: { correo, estado: 'ACTIVO' } });
+    if (!user) return { error: 'Usuario no encontrado', status: 404 };
+
     await prisma.usuario.update({
-      where: { correo },
+      where: { id: user.id },
       data: {
         password: hashPassword(nuevaPassword),
         resetPin: null,

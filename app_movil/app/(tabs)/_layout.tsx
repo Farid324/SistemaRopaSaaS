@@ -1,7 +1,7 @@
 // app_movil/app/(tabs)/_layout.tsx  (REEMPLAZA el existente)
 
 import React from 'react';
-import { View, Text, StyleSheet, Platform, Image, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, Platform, Image, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { Tabs, Redirect, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -46,7 +46,7 @@ const ALL_TABS: { name: TabName; title: string; icon: keyof typeof Ionicons.glyp
 
 export default function TabsLayout() {
   const { colors, isDark } = useTheme();
-  const { currentUser, profilePhoto } = useAuth();
+  const { currentUser, profilePhoto, photoUploading } = useAuth();
 
   if (!currentUser) return <Redirect href="/(auth)/login" />;
   if (currentUser.debeCambiarPass) return <Redirect href="/(auth)/cambiar-contrasena" />;
@@ -80,7 +80,11 @@ export default function TabsLayout() {
               <View style={st.notificationBadge} />
             </TouchableOpacity>
             <TouchableOpacity activeOpacity={0.8} onPress={() => router.navigate('/(tabs)/perfil')}>
-              {profilePhoto ? (
+              {photoUploading ? (
+                <View style={[st.avatar, { backgroundColor: 'rgba(0,0,0,0.1)' }]}>
+                  <ActivityIndicator size="small" color={colors.acRose} />
+                </View>
+              ) : profilePhoto ? (
                 <Image source={{ uri: profilePhoto }} style={st.avatarImg} />
               ) : (
                 <LinearGradient colors={['#fb7185', '#f59e0b']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={st.avatar}>

@@ -48,13 +48,13 @@ export const usuariosController = {
         return res.status(403).json({ message: 'Admin solo puede crear empleados' });
       }
 
-      // Validar si ya existe
-      const existingUser = await usuariosService.findByEmailOrCi(req.body.correo, req.body.ci);
+      // Validar si ya existe DENTRO DE LA MISMA EMPRESA
+      const existingUser = await usuariosService.findByEmailOrCi(req.body.correo, req.body.ci, user.empresaId);
       if (existingUser) {
         if (existingUser.estado === 'CERRADO') {
           return res.status(409).json({ message: 'Este usuario fue eliminado anteriormente. ¿Desea reactivarlo?', reactivateId: existingUser.id });
         }
-        return res.status(409).json({ message: 'CI o correo ya registrado' });
+        return res.status(409).json({ message: 'CI o correo ya registrado en esta empresa' });
       }
 
       const defaultSucursalId = isOwnerRole(user.rol) ? undefined : user.sucursalId;

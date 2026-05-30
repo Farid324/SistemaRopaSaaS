@@ -32,6 +32,7 @@ interface AuthState {
   isRestoring: boolean;
   error: string | null;
   profilePhoto: string | null;
+  photoUploading: boolean;
   login: (correo: string, password: string) => Promise<boolean>;
   logout: () => Promise<void>;
   cambiarPassword: (nuevaPassword: string) => Promise<boolean>;
@@ -48,6 +49,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isRestoring, setIsRestoring] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [profilePhoto, setProfilePhotoState] = useState<string | null>(null);
+  const [photoUploading, setPhotoUploading] = useState(false);
 
   useEffect(() => { restoreSession(); }, []);
 
@@ -70,7 +72,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // ═══════════════════ PUNTO 1: Foto de perfil persistente ═══════════════════
   const setProfilePhoto = useCallback(async (uri: string | null, providedBase64?: string | null) => {
-    setProfilePhotoState(uri);
+    setPhotoUploading(true);
 
     try {
       let base64Data: string | null = null;
@@ -85,12 +87,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         base64Data = `data:${mimeType};base64,${providedBase64}`;
       }
 
-      // Enviar al backend
+      // Enviar al backend — NO actualizamos la foto local hasta que el servidor confirme
       await api.post('/auth/actualizar-foto', { fotoPerfil: base64Data });
+
+      // Solo si el servidor responde OK, mostramos la foto
+      setProfilePhotoState(uri);
     } catch (error) {
       console.log('Error subiendo foto de perfil:', error);
-      // La foto local se mantiene para UX, pero no persistirá
+      // NO actualizamos profilePhotoState — la foto no se muestra
       throw error;
+    } finally {
+      setPhotoUploading(false);
     }
   }, []);
 
@@ -149,7 +156,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <AuthContext.Provider value={{
-      currentUser, isLoading, isRestoring, error, profilePhoto,
+      currentUser, isLoading, isRestoring, error, profilePhoto, photoUploading,
       login, logout, cambiarPassword, clearError, refreshUser, setProfilePhoto,
     }}>
       {children}

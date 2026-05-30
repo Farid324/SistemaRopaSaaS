@@ -108,7 +108,7 @@ async function main() {
   });
 
   const owner1 = await prisma.usuario.upsert({
-    where: { ci: '12345678' },
+    where: { ci_empresaId: { ci: '12345678', empresaId: empresa1.id } },
     update: {},
     create: {
       nombreCompleto: 'Carlos Mendoza',
@@ -125,7 +125,7 @@ async function main() {
   });
 
   const admin1 = await prisma.usuario.upsert({
-    where: { ci: '23456789' },
+    where: { ci_empresaId: { ci: '23456789', empresaId: empresa1.id } },
     update: {},
     create: {
       nombreCompleto: 'Ana García',
@@ -143,7 +143,7 @@ async function main() {
   });
 
   const empleado1 = await prisma.usuario.upsert({
-    where: { ci: '34567890' },
+    where: { ci_empresaId: { ci: '34567890', empresaId: empresa1.id } },
     update: {},
     create: {
       nombreCompleto: 'Luis Torres',
@@ -194,7 +194,7 @@ async function main() {
   });
 
   const owner2 = await prisma.usuario.upsert({
-    where: { ci: '44556677' },
+    where: { ci_empresaId: { ci: '44556677', empresaId: empresa2.id } },
     update: {},
     create: {
       nombreCompleto: 'María Fernández',
@@ -211,7 +211,7 @@ async function main() {
   });
 
   const empleado2 = await prisma.usuario.upsert({
-    where: { ci: '55667788' },
+    where: { ci_empresaId: { ci: '55667788', empresaId: empresa2.id } },
     update: {},
     create: {
       nombreCompleto: 'Diego Salazar',
@@ -262,7 +262,7 @@ async function main() {
   });
 
   const owner3 = await prisma.usuario.upsert({
-    where: { ci: '77889900' },
+    where: { ci_empresaId: { ci: '77889900', empresaId: empresa3.id } },
     update: {},
     create: {
       nombreCompleto: 'Roberto Chávez',
@@ -279,7 +279,7 @@ async function main() {
   });
 
   const admin3 = await prisma.usuario.upsert({
-    where: { ci: '88990011' },
+    where: { ci_empresaId: { ci: '88990011', empresaId: empresa3.id } },
     update: {},
     create: {
       nombreCompleto: 'Sofía Mamani',
@@ -310,7 +310,7 @@ async function main() {
 
   for (const p of prendasData) {
     await prisma.prenda.upsert({
-      where: { codigo: p.codigo },
+      where: { codigo_empresaId: { codigo: p.codigo, empresaId: empresa1.id } },
       update: {},
       create: { ...p, empresaId: empresa1.id },
     });

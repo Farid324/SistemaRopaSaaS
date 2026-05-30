@@ -33,9 +33,8 @@ export const prendasController = {
       const codigo = asString(req.params.codigo);
       if (!codigo) return res.status(400).json({ message: 'Código requerido' });
 
-      const prenda = await prendasService.findByCodigo(codigo);
+      const prenda = await prendasService.findByCodigo(codigo, req.user!.empresaId);
       if (!prenda) return res.status(404).json({ message: 'Prenda no encontrada' });
-      if (prenda.empresaId !== req.user!.empresaId) return res.status(404).json({ message: 'Prenda no encontrada' });
 
       res.json(prenda);
     } catch (error) {

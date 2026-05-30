@@ -92,9 +92,9 @@ export const usuariosService = {
     return prisma.usuario.findUnique({ where: { id } });
   },
 
-  async findByEmailOrCi(correo: string, ci: string) {
+  async findByEmailOrCi(correo: string, ci: string, empresaId: string) {
     return prisma.usuario.findFirst({
-      where: { OR: [{ correo }, { ci }] }
+      where: { empresaId, OR: [{ correo }, { ci }] }
     });
   },
 };

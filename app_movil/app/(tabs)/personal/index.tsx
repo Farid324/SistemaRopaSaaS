@@ -387,6 +387,7 @@ export default function PersonalScreen() {
               setShowForm(false);
             } catch (error: any) {
               if (error.response?.data?.reactivateId) {
+                const targetId = error.response.data.reactivateId;
                 setConfirmModal({
                   visible: true,
                   title: 'Reactivar Usuario',
@@ -398,13 +399,14 @@ export default function PersonalScreen() {
                   confirmColor: ['#38bdf8', '#0284c7'],
                   onConfirm: async () => {
                     try {
-                      await api.put(`/usuarios/${error.response.data.reactivateId}`, { ...data, estado: 'ACTIVO' });
+                      await api.put(`/usuarios/${targetId}`, { ...data, estado: 'ACTIVO' });
                       toast.success('Usuario reactivado exitosamente');
                       await fetchData();
                       setShowForm(false);
                       setConfirmModal(INITIAL_CONFIRM_STATE);
                     } catch (e: any) {
-                      toast.error(e.response?.data?.message || 'No se pudo reactivar');
+                      console.error('Reactivation error:', e);
+                      toast.error(e.response?.data?.message || e.message || 'No se pudo reactivar');
                       setConfirmModal(INITIAL_CONFIRM_STATE);
                     }
                   },

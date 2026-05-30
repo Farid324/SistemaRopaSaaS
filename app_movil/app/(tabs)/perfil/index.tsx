@@ -28,7 +28,7 @@ function getRolBadge(rol: Rol, colors: any) {
 
 export default function PerfilScreen() {
   const { colors, isDark, toggleTheme } = useTheme();
-  const { currentUser, logout, profilePhoto, setProfilePhoto } = useAuth();
+  const { currentUser, logout, profilePhoto, setProfilePhoto, photoUploading } = useAuth();
   const toast = useToast();
 
   const [showChangePass, setShowChangePass] = useState(false);
@@ -118,18 +118,24 @@ export default function PerfilScreen() {
       <View style={[st.card, { backgroundColor: colors.cdSolid, borderColor: colors.bd2Solid, ...colors.cardShadow }]}>
         <View style={st.profileHeader}>
           <TouchableOpacity onPress={showPhotoOptions} activeOpacity={0.8} style={st.avatarWrap}>
-            {profilePhoto ? (
+            {photoUploading ? (
+              <View style={[st.avatarCircle, { backgroundColor: 'rgba(0,0,0,0.15)', alignItems: 'center', justifyContent: 'center' }]}>
+                <ActivityIndicator size="large" color={colors.acRose} />
+              </View>
+            ) : profilePhoto ? (
               <Image source={{ uri: profilePhoto }} style={st.avatarImg} />
             ) : (
               <LinearGradient colors={['#fb7185', '#f59e0b']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={st.avatarCircle}>
                 <Text style={st.avatarLetter}>{currentUser.nombreCompleto.charAt(0)}</Text>
               </LinearGradient>
             )}
-            <View style={st.cameraBtn}>
-              <LinearGradient colors={['#fb7185', '#f59e0b']} style={st.cameraBtnInner}>
-                <Ionicons name="camera" size={12} color="#fff" />
-              </LinearGradient>
-            </View>
+            {!photoUploading && (
+              <View style={st.cameraBtn}>
+                <LinearGradient colors={['#fb7185', '#f59e0b']} style={st.cameraBtnInner}>
+                  <Ionicons name="camera" size={12} color="#fff" />
+                </LinearGradient>
+              </View>
+            )}
           </TouchableOpacity>
           <Text style={[st.userName, { color: colors.tx }]}>{currentUser.nombreCompleto}</Text>
           <View style={[st.rolBadge, { backgroundColor: badge.bg, borderColor: badge.border }]}>

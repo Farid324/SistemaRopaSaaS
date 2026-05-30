@@ -99,8 +99,8 @@ model Sucursal {
 model Usuario {
   id                   String        @id @default(uuid())
   nombreCompleto       String
-  ci                   String        @unique
-  correo               String        @unique
+  ci                   String
+  correo               String
   telefono             String?
   edad                 Int?
   fechaIngreso         DateTime      @default(now())
@@ -120,11 +120,14 @@ model Usuario {
   sucursal         Sucursal? @relation(fields: [sucursalId], references: [id])
 
   ventasRealizadas Venta[]   @relation("Vendedor")
+
+  @@unique([ci, empresaId])
+  @@unique([correo, empresaId])
 }
 
 model Prenda {
   id          String       @id @default(uuid())
-  codigo      String       @unique
+  codigo      String
   tipoCodigo  TipoCodigo   @default(MANUAL)
   marca       String?
   tipo        String       // Blusa, Pantalón, Vestido, etc.
@@ -142,6 +145,8 @@ model Prenda {
   sucursal   Sucursal @relation(fields: [sucursalId], references: [id])
 
   detallesVenta DetalleVenta[]
+
+  @@unique([codigo, empresaId])
 }
 
 model Venta {

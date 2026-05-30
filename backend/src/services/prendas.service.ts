@@ -31,9 +31,9 @@ export const prendasService = {
     });
   },
 
-  async findByCodigo(codigo: string) {
-    return prisma.prenda.findUnique({
-      where: { codigo },
+  async findByCodigo(codigo: string, empresaId?: string) {
+    return prisma.prenda.findFirst({
+      where: { codigo, ...(empresaId ? { empresaId } : {}) },
       include: { sucursal: { select: { nombre: true } } },
     });
   },
