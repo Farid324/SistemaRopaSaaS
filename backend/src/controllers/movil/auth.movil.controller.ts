@@ -1,9 +1,9 @@
-// backend/src/controllers/auth.controller.ts  (REEMPLAZA el existente)
+// backend/src/controllers/movil/auth.movil.controller.ts
 
 import { Request, Response } from 'express';
-import { authService } from '../services/auth.service';
+import { authService } from '../../services/auth.service';
 
-export const authController = {
+export const authMovilController = {
   async login(req: Request, res: Response) {
     try {
       const { correo, password } = req.body;
@@ -56,11 +56,10 @@ export const authController = {
       res.status(500).json({ message: 'Error al cambiar contraseña' });
     }
   },
-  // ═══════════════════ PUNTO 1: Foto de perfil persistente ═══════════════════
+
   async actualizarFoto(req: Request, res: Response) {
     try {
       const { fotoPerfil } = req.body;
-      // fotoPerfil puede ser un string base64 (data:image/...) o null para quitar
       const result = await authService.actualizarFotoPerfil(req.user!.userId, fotoPerfil || null);
       res.json(result);
     } catch (error) {
@@ -79,7 +78,7 @@ export const authController = {
       res.status(500).json({ message: 'Error al obtener perfil' });
     }
   },
-
+  
   // ════════════ RECUPERACIÓN DE CONTRASEÑA ════════════
   async forgotPassword(req: Request, res: Response) {
     try {

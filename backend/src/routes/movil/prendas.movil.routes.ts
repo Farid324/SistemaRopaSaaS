@@ -1,9 +1,9 @@
 // backend/src/routes/prendas.routes.ts
 
 import { Router } from 'express';
-import { prendasController } from '../controllers/prendas.controller';
-import { authMiddleware } from '../shared/middlewares/authMiddleware';
-import { anyRole, ownersAndAdmins } from '../shared/middlewares/roleMiddleware';
+import { prendasController } from '../../controllers/movil/prendas.movil.controller';
+import { authMiddleware } from '../../shared/middlewares/authMiddleware';
+import { anyRole, ownersAndAdmins } from '../../shared/middlewares/roleMiddleware';
 
 const router = Router();
 

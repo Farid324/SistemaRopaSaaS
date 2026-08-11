@@ -1,9 +1,9 @@
 // backend/src/routes/ventas.routes.ts
 
 import { Router } from 'express';
-import { ventasController } from '../controllers/ventas.controller';
-import { authMiddleware } from '../shared/middlewares/authMiddleware';
-import { anyRole } from '../shared/middlewares/roleMiddleware';
+import { ventasController } from '../../controllers/movil/ventas.movil.controller';
+import { authMiddleware } from '../../shared/middlewares/authMiddleware';
+import { anyRole } from '../../shared/middlewares/roleMiddleware';
 
 const router = Router();
 

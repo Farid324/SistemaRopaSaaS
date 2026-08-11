@@ -1,14 +1,14 @@
 // backend/src/controllers/sucursales.controller.ts
 
 import { Request, Response } from 'express';
-import { sucursalesService } from '../services/sucursales.service';
-import { asString } from '../shared/helpers';
+import { sucursalesService } from '../../services/sucursales.service';
+import { asString } from '../../shared/helpers';
 
 export const sucursalesController = {
   async list(req: Request, res: Response) {
     try {
       // SIEMPRE filtrar por la empresa del usuario autenticado (del JWT)
-      const empresaId = req.user!.empresaId;
+      const empresaId = req.user!.empresaId!;
       const sucursales = await sucursalesService.list(empresaId);
       res.json(sucursales);
     } catch (error) {
@@ -19,7 +19,7 @@ export const sucursalesController = {
 
   async create(req: Request, res: Response) {
     try {
-      const sucursal = await sucursalesService.create(req.body, req.user!.empresaId);
+      const sucursal = await sucursalesService.create(req.body, req.user!.empresaId!);
       res.status(201).json(sucursal);
     } catch (error) {
       console.error('Create sucursal error:', error);
@@ -33,7 +33,7 @@ export const sucursalesController = {
       if (!id) return res.status(400).json({ message: 'ID requerido' });
 
       // Verificar que la sucursal pertenece a la empresa del usuario
-      const sucursales = await sucursalesService.list(req.user!.empresaId);
+      const sucursales = await sucursalesService.list(req.user!.empresaId!);
       if (!sucursales.some((s) => s.id === id)) {
         return res.status(404).json({ message: 'Sucursal no encontrada' });
       }
@@ -55,7 +55,7 @@ export const sucursalesController = {
       if (!id) return res.status(400).json({ message: 'ID requerido' });
 
       // Verificar que la sucursal pertenece a la empresa del usuario
-      const sucursales = await sucursalesService.list(req.user!.empresaId);
+      const sucursales = await sucursalesService.list(req.user!.empresaId!);
       if (!sucursales.some((s) => s.id === id)) {
         return res.status(404).json({ message: 'Sucursal no encontrada' });
       }
@@ -78,7 +78,7 @@ export const sucursalesController = {
       if (!id) return res.status(400).json({ message: 'ID requerido' });
 
       // Verificar que la sucursal pertenece a la empresa del usuario
-      const sucursales = await sucursalesService.list(req.user!.empresaId);
+      const sucursales = await sucursalesService.list(req.user!.empresaId!);
       if (!sucursales.some((s) => s.id === id)) {
         return res.status(404).json({ message: 'Sucursal no encontrada' });
       }
@@ -97,7 +97,7 @@ export const sucursalesController = {
       if (!id) return res.status(400).json({ message: 'ID requerido' });
 
       // Verificar que la sucursal pertenece a la empresa del usuario
-      const sucursales = await sucursalesService.list(req.user!.empresaId);
+      const sucursales = await sucursalesService.list(req.user!.empresaId!);
       if (!sucursales.some((s) => s.id === id)) {
         return res.status(404).json({ message: 'Sucursal no encontrada' });
       }

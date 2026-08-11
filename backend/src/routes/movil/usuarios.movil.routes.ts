@@ -1,9 +1,9 @@
 // backend/src/routes/usuarios.routes.ts
 
 import { Router } from 'express';
-import { usuariosController } from '../controllers/usuarios.controller';
-import { authMiddleware } from '../shared/middlewares/authMiddleware';
-import { ownersAndAdmins } from '../shared/middlewares/roleMiddleware';
+import { usuariosController } from '../../controllers/movil/usuarios.movil.controller';
+import { authMiddleware } from '../../shared/middlewares/authMiddleware';
+import { ownersAndAdmins } from '../../shared/middlewares/roleMiddleware';
 
 const router = Router();
 

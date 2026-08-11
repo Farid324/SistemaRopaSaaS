@@ -1,8 +1,8 @@
 // backend/src/controllers/ventas.controller.ts
 
 import { Request, Response } from 'express';
-import { ventasService } from '../services/ventas.service';
-import { isOwnerRole } from '../shared/helpers';
+import { ventasService } from '../../services/ventas.service';
+import { isOwnerRole } from '../../shared/helpers';
 
 export const ventasController = {
   async list(req: Request, res: Response) {
@@ -10,7 +10,7 @@ export const ventasController = {
       const user = req.user!;
       // SIEMPRE filtrar por la empresa del usuario autenticado (del JWT)
       const filters: any = {
-        empresaId: user.empresaId,
+        empresaId: user.empresaId!,
       };
 
       // Si NO es owner, filtrar por su sucursal
@@ -42,7 +42,7 @@ export const ventasController = {
       if (!sucursalId) return res.status(400).json({ message: 'Sucursal requerida' });
 
       const venta = await ventasService.crear({
-        empresaId: user.empresaId,
+        empresaId: user.empresaId!,
         sucursalId,
         vendedorId: user.userId,
         prendaIds,

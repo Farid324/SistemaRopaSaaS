@@ -1,9 +1,9 @@
 // backend/src/routes/sucursales.routes.ts
 
 import { Router } from 'express';
-import { sucursalesController } from '../controllers/sucursales.controller';
-import { authMiddleware } from '../shared/middlewares/authMiddleware';
-import { onlyOwners, anyRole } from '../shared/middlewares/roleMiddleware';
+import { sucursalesController } from '../../controllers/movil/sucursales.movil.controller';
+import { authMiddleware } from '../../shared/middlewares/authMiddleware';
+import { onlyOwners, anyRole } from '../../shared/middlewares/roleMiddleware';
 
 const router = Router();
 

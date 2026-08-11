@@ -18,12 +18,14 @@ enum Rol {
   CO_OWNER
   ADMINISTRADOR
   EMPLEADO
+  CLIENTE
 }
 
 enum EstadoGeneral {
   ACTIVO
   BLOQUEADO
   CERRADO
+  PENDIENTE
 }
 
 enum MetodoPago {
@@ -53,22 +55,23 @@ enum EstadoVenta {
 // ═══════════════════ TABLAS ═══════════════════
 
 model PlanSuscripcion {
-  id              String    @id @default(uuid())
-  nombre          String    // Semilla, Crecimiento, Corporativo
-  precioBsMensual Float     @default(0)
+  id                 String    @id @default(uuid())
+  nombre             String // Semilla, Crecimiento, Corporativo
+  precioBsMensual    Float     @default(0)
   precioBsTrimestral Float? // solo Crecimiento
-  precioBsAnual   Float?
-  limitePrendas   Int
-  limiteSucursal  Int
-  limiteEmpleados Int       @default(2)
-  accesoWeb       Boolean   @default(false) // Semilla = false
-  empresas        Empresa[]
+  precioBsAnual      Float?
+  limitePrendas      Int
+  limiteSucursal     Int
+  limiteEmpleados    Int       @default(2)
+  accesoWeb          Boolean   @default(false) // Semilla = false
+  empresas           Empresa[]
 }
 
 model Empresa {
   id            String   @id @default(uuid())
   nombre        String
-  fechaRegistro DateTime @default(now())
+  fechaRegistro DateTime      @default(now())
+  estado        EstadoGeneral @default(PENDIENTE)
 
   planId String
   plan   PlanSuscripcion @relation(fields: [planId], references: [id])
@@ -80,13 +83,13 @@ model Empresa {
 }
 
 model Sucursal {
-  id                  String        @id @default(uuid())
-  nombre              String
-  direccion           String?
-  detalles            String?
-  horarios            String?       @default("08:00 - 20:00")
-  maxAdministradores  Int           @default(2)
-  estado              EstadoGeneral @default(ACTIVO)
+  id                 String        @id @default(uuid())
+  nombre             String
+  direccion          String?
+  detalles           String?
+  horarios           String?       @default("08:00 - 20:00")
+  maxAdministradores Int           @default(2)
+  estado             EstadoGeneral @default(ACTIVO)
 
   empresaId String
   empresa   Empresa @relation(fields: [empresaId], references: [id])
@@ -105,7 +108,7 @@ model Usuario {
   edad                 Int?
   fechaIngreso         DateTime      @default(now())
   fotoPerfil           String?
-  password             String        // Inicialmente = CI
+  password             String // Inicialmente = CI
   debeCambiarPass      Boolean       @default(true)
   rol                  Rol
   estado               EstadoGeneral @default(ACTIVO)
@@ -113,31 +116,37 @@ model Usuario {
   resetPin             String?
   resetPinExpires      DateTime?
 
-  empresaId String
-  empresa   Empresa @relation(fields: [empresaId], references: [id])
+  // ── Verificación de correo (Clientes web) ──
+  emailVerificado        Boolean   @default(false)
+  verificationPin        String?
+  verificationPinExpires DateTime?
+  googleId               String?   @unique
 
-  sucursalId       String?
-  sucursal         Sucursal? @relation(fields: [sucursalId], references: [id])
+  empresaId String?
+  empresa   Empresa? @relation(fields: [empresaId], references: [id])
 
-  ventasRealizadas Venta[]   @relation("Vendedor")
+  sucursalId String?
+  sucursal   Sucursal? @relation(fields: [sucursalId], references: [id])
+
+  ventasRealizadas Venta[] @relation("Vendedor")
 
   @@unique([ci, empresaId])
   @@unique([correo, empresaId])
 }
 
 model Prenda {
-  id          String       @id @default(uuid())
-  codigo      String
-  tipoCodigo  TipoCodigo   @default(MANUAL)
-  marca       String?
-  tipo        String       // Blusa, Pantalón, Vestido, etc.
-  detalles    String?
-  estado      EstadoPrenda @default(NUEVO)
-  foto        String?
-  precio      Float
-  rebaja      Float?
-  estadoVenta EstadoVenta  @default(DISPONIBLE)
-  publicadoWeb Boolean     @default(false)
+  id           String       @id @default(uuid())
+  codigo       String
+  tipoCodigo   TipoCodigo   @default(MANUAL)
+  marca        String?
+  tipo         String // Blusa, Pantalón, Vestido, etc.
+  detalles     String?
+  estado       EstadoPrenda @default(NUEVO)
+  foto         String?
+  precio       Float
+  rebaja       Float?
+  estadoVenta  EstadoVenta  @default(DISPONIBLE)
+  publicadoWeb Boolean      @default(false)
 
   empresaId  String
   empresa    Empresa  @relation(fields: [empresaId], references: [id])
@@ -181,3 +190,10 @@ model PagoVenta {
   metodo  MetodoPago
   monto   Float
 }
+
+// ── Configuración Global del Sistema (Super Admin) ──
+model Configuracion {
+  clave String @id
+  valor String @db.Text
+}
+

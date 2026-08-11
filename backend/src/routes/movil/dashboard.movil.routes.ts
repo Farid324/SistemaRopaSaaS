@@ -1,9 +1,9 @@
 // backend/src/routes/dashboard.routes.ts  (REEMPLAZA el existente)
 
 import { Router } from 'express';
-import { dashboardController } from '../controllers/dashboard.controller';
-import { authMiddleware } from '../shared/middlewares/authMiddleware';
-import { anyRole, onlyOwners } from '../shared/middlewares/roleMiddleware';
+import { dashboardController } from '../../controllers/movil/dashboard.movil.controller';
+import { authMiddleware } from '../../shared/middlewares/authMiddleware';
+import { anyRole, onlyOwners } from '../../shared/middlewares/roleMiddleware';
 
 const router = Router();
 

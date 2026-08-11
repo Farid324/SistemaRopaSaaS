@@ -1,15 +1,15 @@
 // backend/src/controllers/usuarios.controller.ts
 
 import { Request, Response } from 'express';
-import { usuariosService } from '../services/usuarios.service';
-import { asString, isOwnerRole } from '../shared/helpers';
+import { usuariosService } from '../../services/usuarios.service';
+import { asString, isOwnerRole } from '../../shared/helpers';
 
 export const usuariosController = {
   async list(req: Request, res: Response) {
     try {
       const user = req.user!;
       // SIEMPRE filtrar por la empresa del usuario autenticado (del JWT)
-      const empresaId = user.empresaId;
+      const empresaId = user.empresaId!;
 
       // Si NO es owner, filtrar también por su sucursal
       const sucursalId = isOwnerRole(user.rol) ? undefined : user.sucursalId;
@@ -49,7 +49,7 @@ export const usuariosController = {
       }
 
       // Validar si ya existe DENTRO DE LA MISMA EMPRESA
-      const existingUser = await usuariosService.findByEmailOrCi(req.body.correo, req.body.ci, user.empresaId);
+      const existingUser = await usuariosService.findByEmailOrCi(req.body.correo, req.body.ci, user.empresaId!);
       if (existingUser) {
         if (existingUser.estado === 'CERRADO') {
           return res.status(409).json({ message: 'Este usuario fue eliminado anteriormente. ¿Desea reactivarlo?', reactivateId: existingUser.id });
@@ -58,7 +58,7 @@ export const usuariosController = {
       }
 
       const defaultSucursalId = isOwnerRole(user.rol) ? undefined : user.sucursalId;
-      const usuario = await usuariosService.create(req.body, user.empresaId, defaultSucursalId, user.userId);
+      const usuario = await usuariosService.create(req.body, user.empresaId!, defaultSucursalId, user.userId);
       res.status(201).json(usuario);
     } catch (error: any) {
       if (error.code === 'P2002') return res.status(409).json({ message: 'CI o correo ya registrado' });

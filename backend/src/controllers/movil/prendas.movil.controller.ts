@@ -1,8 +1,8 @@
 // backend/src/controllers/prendas.controller.ts
 
 import { Request, Response } from 'express';
-import { prendasService } from '../services/prendas.service';
-import { asString, isOwnerRole } from '../shared/helpers';
+import { prendasService } from '../../services/prendas.service';
+import { asString, isOwnerRole } from '../../shared/helpers';
 
 export const prendasController = {
   async list(req: Request, res: Response) {
@@ -10,7 +10,7 @@ export const prendasController = {
       const user = req.user!;
       // SIEMPRE filtrar por la empresa del usuario autenticado (del JWT)
       const filters: any = {
-        empresaId: user.empresaId,
+        empresaId: user.empresaId!,
         estadoVenta: asString(req.query.estadoVenta),
         search: asString(req.query.search),
       };
@@ -33,7 +33,7 @@ export const prendasController = {
       const codigo = asString(req.params.codigo);
       if (!codigo) return res.status(400).json({ message: 'Código requerido' });
 
-      const prenda = await prendasService.findByCodigo(codigo, req.user!.empresaId);
+      const prenda = await prendasService.findByCodigo(codigo, req.user!.empresaId!);
       if (!prenda) return res.status(404).json({ message: 'Prenda no encontrada' });
 
       res.json(prenda);
@@ -48,7 +48,7 @@ export const prendasController = {
       const user = req.user!;
       const sucursalId = isOwnerRole(user.rol) ? req.body.sucursalId : user.sucursalId;
 
-      const prenda = await prendasService.create(req.body, user.empresaId, sucursalId);
+      const prenda = await prendasService.create(req.body, user.empresaId!, sucursalId);
       res.status(201).json(prenda);
     } catch (error: any) {
       if (error.code === 'P2002') return res.status(409).json({ message: 'Código ya registrado' });
@@ -64,7 +64,7 @@ export const prendasController = {
 
       // Verificar que la prenda pertenece a la empresa del usuario
       const existing = await prendasService.findById(id);
-      if (!existing || existing.empresaId !== req.user!.empresaId) {
+      if (!existing || existing.empresaId !== req.user!.empresaId!) {
         return res.status(404).json({ message: 'Prenda no encontrada' });
       }
 
@@ -83,7 +83,7 @@ export const prendasController = {
 
       // Verificar que la prenda pertenece a la empresa del usuario
       const existing = await prendasService.findById(id);
-      if (!existing || existing.empresaId !== req.user!.empresaId) {
+      if (!existing || existing.empresaId !== req.user!.empresaId!) {
         return res.status(404).json({ message: 'Prenda no encontrada' });
       }
 

@@ -8,7 +8,7 @@ const JWT_EXPIRES_IN = '7d';
 
 export interface TokenPayload {
   userId: string;
-  empresaId: string;
+  empresaId: string | null;
   rol: string;
   sucursalId?: string;
 }
