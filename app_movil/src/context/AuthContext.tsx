@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 
 import api, { tokenStorage } from '../services/api';
+// import { signInWithGoogleAsync, signOutGoogle } from '../services/googleAuth';
 
 export type Rol = 'SUPER_ADMIN' | 'OWNER_PRINCIPAL' | 'CO_OWNER' | 'ADMINISTRADOR' | 'EMPLEADO';
 export type EstadoGeneral = 'ACTIVO' | 'BLOQUEADO' | 'CERRADO';
@@ -120,6 +121,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  const loginWithGoogle = useCallback(async (): Promise<boolean> => {
+    alert("Función de Google temporalmente desactivada para usar Expo Go. Usa login manual.");
+    return false;
+  }, []);
+
   const cambiarPassword = useCallback(async (nuevaPassword: string): Promise<boolean> => {
     setIsLoading(true);
     setError(null);
@@ -139,6 +145,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const logout = useCallback(async () => {
     await tokenStorage.remove();
+    // await signOutGoogle();
     setCurrentUser(null);
     setProfilePhotoState(null);
     setError(null);

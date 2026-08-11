@@ -225,42 +225,41 @@ export default function LoginScreen() {
               </LinearGradient>
             </TouchableOpacity>
 
+            {/* ── Divisor "O" ── */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginVertical: 16 }}>
+              <View style={{ flex: 1, height: 1, backgroundColor: colors.bd }} />
+              <Text style={{ marginHorizontal: 10, color: colors.tx4, fontSize: 13 }}>O inicia con</Text>
+              <View style={{ flex: 1, height: 1, backgroundColor: colors.bd }} />
+            </View>
+
+            {/* ── Botón Google ── */}
+            <TouchableOpacity
+              onPress={() => alert('Para habilitar Google Login en la app móvil, necesitamos configurar el ID de Android en Google Cloud.')}
+              activeOpacity={0.85}
+              style={{
+                height: 52,
+                borderRadius: 14,
+                backgroundColor: isDark ? '#ffffff' : '#f8f9fa',
+                borderWidth: 1,
+                borderColor: isDark ? '#ffffff' : '#e5e7eb',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexDirection: 'row',
+                marginBottom: 16,
+              }}
+            >
+              <Ionicons name="logo-google" size={20} color={isDark ? '#000' : '#db4437'} style={{ marginRight: 8 }} />
+              <Text style={{ color: isDark ? '#000' : '#374151', fontSize: 16, fontWeight: '600' }}>
+                Continuar con Google
+              </Text>
+            </TouchableOpacity>
+
             {/* ── Olvidé mi contraseña ── */}
             <TouchableOpacity style={styles.forgotButton} activeOpacity={0.6} onPress={() => router.push('/(auth)/forgot-password' as any)}>
               <Text style={[styles.forgotText, { color: colors.acRose }]}>
                 ¿Olvidaste tu contraseña?
               </Text>
             </TouchableOpacity>
-
-            {/* ── Cuentas de prueba (tocar para auto-rellenar) ── */}
-            <View style={[styles.demoDivider, { borderTopColor: colors.bd }]}>
-              <Text style={[styles.demoTitle, { color: colors.tx4 }]}>Cuentas de prueba:</Text>
-
-              <TouchableOpacity onPress={() => fillDemo('carlos@email.com')} activeOpacity={0.6}>
-                <Text style={styles.demoRow}>
-                  <Text style={{ color: colors.acRose }}>Dueño: </Text>
-                  <Text style={{ color: colors.tx3 }}>carlos@email.com</Text>
-                </Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity onPress={() => fillDemo('ana@email.com')} activeOpacity={0.6}>
-                <Text style={styles.demoRow}>
-                  <Text style={{ color: colors.acAmber }}>Admin: </Text>
-                  <Text style={{ color: colors.tx3 }}>ana@email.com</Text>
-                </Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity onPress={() => fillDemo('luis@email.com')} activeOpacity={0.6}>
-                <Text style={styles.demoRow}>
-                  <Text style={{ color: colors.acEmerald }}>Empleado: </Text>
-                  <Text style={{ color: colors.tx3 }}>luis@email.com</Text>
-                </Text>
-              </TouchableOpacity>
-
-              <Text style={[styles.demoPass, { color: colors.tx4 }]}>
-                Contraseña: admin123
-              </Text>
-            </View>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
